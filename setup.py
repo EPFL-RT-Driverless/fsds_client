@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="Simple Python client for FSDS simulation",
+    name="fsds_client",
     version="1.0.0",
     description="Simple Python client for FSDS simulation",
     url="https://github.com/EPFL-RT-Driverless/fsds_client",
@@ -11,8 +11,8 @@ setup(
         # "Development Status :: 1 - Planning",
         # "Development Status :: 2 - Pre-Alpha",
         # "Development Status :: 3 - Alpha",
-        # "Development Status :: 4 - Beta",
-        "Development Status :: 5 - Production/Stable",
+        "Development Status :: 4 - Beta",
+        # "Development Status :: 5 - Production/Stable",
         "Intended Audience :: Science/Research",
         "License :: OSI Approved :: MIT License",
         "Programming Language :: Python :: 3",

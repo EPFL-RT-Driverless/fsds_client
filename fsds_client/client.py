@@ -1,16 +1,11 @@
+# Copyright (c) 2022 Mattéo Berthet, EPFL Racing Team Driverless
 from __future__ import print_function
 
-# import logging
-# import math
 import time
 
-# import msgpack
 import msgpackrpc
 
-# import numpy as np
-
 from .types import *
-from .utils import *
 
 __all__ = ["FSDSClient"]
 

@@ -1,11 +1,9 @@
+# Copyright (c) 2022 Mattéo Berthet, EPFL Racing Team Driverless
 import inspect
 import math
 import os
 import re
 import sys
-
-# import time
-# import types
 
 import numpy as np
 
