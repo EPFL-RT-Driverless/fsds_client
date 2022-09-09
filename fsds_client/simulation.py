@@ -38,7 +38,7 @@ class Simulation:
     def __init__(
         self,
         ip: str = "127.0.0.1",
-        max_steering: float = 30,
+        max_steering: float = 30.0,
         camera_name: str = "examplecam",
     ):
         self.max_steering = max_steering
@@ -51,7 +51,7 @@ class Simulation:
         crash_guard(self.client.restart, "restart")
 
         crash_guard(
-            lambda: self.client.enableApiControl(False),
+            lambda: self.client.enableApiControl(True),
             "enableAPIControl",
             self.client.restart,
         )
