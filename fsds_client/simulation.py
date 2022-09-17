@@ -154,6 +154,43 @@ class Simulation:
             ]
         )
 
+    def find_cones(self):
+        # Get the pointcloud
+        lidardata = self.client.getLidarData(lidar_name="Lidar")
+
+        # no points
+        if len(lidardata.point_cloud) < 3:
+            return []
+
+        # Convert the list of floats into a list of xyz coordinates
+        points = np.array(lidardata.point_cloud, dtype=np.dtype("f4"))
+        points = np.reshape(points, (int(points.shape[0] / 3), 3))
+
+        # Go through all the points and find nearby groups of points that are close together as those will probably be cones.
+
+        current_group = []
+        cones = np.ndarray(shape=(0,2))
+        for i in range(1, len(points)):
+
+            # Get the distance from current to previous point
+            distance_to_last_point = distance(
+                points[i][0], points[i][1], points[i - 1][0], points[i - 1][1]
+            )
+
+            if distance_to_last_point < 0.1:
+                # Points closer together then 10 cm are part of the same group
+                current_group.append(np.array([points[i][0], points[i][1]]))
+            else:
+                # points further away indiate a split between groups
+                if len(current_group) > 0:
+                    cone = pointgroup_to_cone(current_group)
+                    # calculate distance between lidar and cone
+                    if distance(0, 0, cone[0], cone[1]) < 7.0:
+                        cones = np.vstack((cones, cone))
+                    current_group = []
+
+        return cones
+
     def get_image(self) -> np.ndarray:
         """
         Get the current image from the camera.
@@ -196,3 +233,18 @@ def sleep_sub_ms(delay):
     end = time.perf_counter() + delay
     while time.perf_counter() < end:
         pass
+
+
+def distance(x1, y1, x2, y2):
+    return np.sqrt(np.abs(x1 - x2)**2 + np.abs(y1 - y2)**2)
+
+
+def pointgroup_to_cone(group):
+    average_x = 0
+    average_y = 0
+    for point in group:
+        average_x += point[0]
+        average_y += point[1]
+    average_x = average_x / len(group)
+    average_y = average_y / len(group)
+    return np.array([average_x, average_y])
