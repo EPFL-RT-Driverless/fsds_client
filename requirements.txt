@@ -1,0 +1,2 @@
+numpy
+msgpack-rpc-python
