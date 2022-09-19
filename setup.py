@@ -6,11 +6,15 @@ with open("README.md", "r") as fh:
 with open("requirements.txt", "r") as fh:
     requirements = fh.read().splitlines()
     # remove lines that start with #
-    requirements = [r for r in requirements if not r.startswith("#")]
+    requirements = [
+        r
+        for r in requirements
+        if not (r.startswith("#") or r.startswith("-e git+") or r.startswith("git+"))
+    ]
 
 setup(
     name="fsds_client",
-    version="2.0.0",
+    version="2.0.1",
     description="Simple Python client for FSDS simulation",
     long_description=long_description,
     url="https://github.com/EPFL-RT-Driverless/fsds_client",
