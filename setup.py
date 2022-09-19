@@ -1,9 +1,18 @@
 from setuptools import setup, find_packages
 
+with open("README.md", "r") as fh:
+    long_description = fh.read()
+
+with open("requirements.txt", "r") as fh:
+    requirements = fh.read().splitlines()
+    # remove lines that start with #
+    requirements = [r for r in requirements if not r.startswith("#")]
+
 setup(
     name="fsds_client",
-    version="1.0.0",
+    version="2.0.0",
     description="Simple Python client for FSDS simulation",
+    long_description=long_description,
     url="https://github.com/EPFL-RT-Driverless/fsds_client",
     author="Mattéo Berthet",
     license="MIT",
@@ -19,5 +28,5 @@ setup(
         "Private :: Do Not Upload",
     ],
     packages=find_packages(include=["fsds_client"]),
-    install_requires=["numpy", "msgpack-rpc-python"],
+    install_requires=requirements,
 )
