@@ -169,7 +169,7 @@ class Simulation:
         # Go through all the points and find nearby groups of points that are close together as those will probably be cones.
 
         current_group = []
-        cones = np.ndarray(shape=(0,2))
+        cones = np.ndarray(shape=(0, 2))
         for i in range(1, len(points)):
 
             # Get the distance from current to previous point
@@ -236,7 +236,7 @@ def sleep_sub_ms(delay):
 
 
 def distance(x1, y1, x2, y2):
-    return np.sqrt(np.abs(x1 - x2)**2 + np.abs(y1 - y2)**2)
+    return np.sqrt(np.abs(x1 - x2) ** 2 + np.abs(y1 - y2) ** 2)
 
 
 def pointgroup_to_cone(group):
