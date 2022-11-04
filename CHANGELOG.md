@@ -1,3 +1,7 @@
+# v2.0.2
+
+:bug: added `sleep_sub_ms()` call to avoid erros in `enableApiControl`
+
 # v2.0.1
 
 🐛 Fixed import of git deps in `setup.py`
