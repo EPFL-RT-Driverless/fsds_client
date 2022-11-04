@@ -50,6 +50,8 @@ class Simulation:
 
         crash_guard(self.client.restart, "restart")
 
+        sleep_sub_ms(1)
+
         crash_guard(
             lambda: self.client.enableApiControl(True),
             "enableAPIControl",
