@@ -248,3 +248,4 @@ def pointgroup_to_cone(group):
     average_x = average_x / len(group)
     average_y = average_y / len(group)
     return np.array([average_x, average_y])
+
