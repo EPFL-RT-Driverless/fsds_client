@@ -4,8 +4,10 @@ from typing import Callable, Optional
 
 import numpy as np
 
-from .client import FSDSClient
+from .low_level_client import LowLevelClient
 from .types import *
+
+__all__ = ["HighLevelClient"]
 
 
 def crash_guard(callback: Callable, error_message: str, aux: Optional[Callable] = None):
@@ -34,7 +36,7 @@ def crash_guard(callback: Callable, error_message: str, aux: Optional[Callable] 
                 simulation_crashed = True
 
 
-class Simulation:
+class HighLevelClient:
     def __init__(
         self,
         ip: str = "127.0.0.1",
@@ -44,7 +46,7 @@ class Simulation:
         self.max_steering = max_steering
         self.camera_name = camera_name
 
-        self.client = FSDSClient(ip, 41451, 3)
+        self.client = LowLevelClient(ip, 41451, 3)
 
         crash_guard(self.client.confirmConnection, "confirmConnection")
 
@@ -250,4 +252,3 @@ def pointgroup_to_cone(group):
     average_x = average_x / len(group)
     average_y = average_y / len(group)
     return np.array([average_x, average_y])
-

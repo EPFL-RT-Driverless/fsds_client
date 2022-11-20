@@ -7,10 +7,10 @@ import msgpackrpc
 
 from .types import *
 
-__all__ = ["FSDSClient"]
+__all__ = ["LowLevelClient"]
 
 
-class FSDSClient:
+class LowLevelClient:
     def __init__(self, ip="", port=41451, timeout_value=5):
         self.ip = ip
         self.port = port
