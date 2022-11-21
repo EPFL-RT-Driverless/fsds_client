@@ -4,8 +4,10 @@ import math
 import os
 import re
 import sys
+import time
 
 import numpy as np
+from scipy.spatial.transform import Rotation as R
 
 from .types import *
 
@@ -19,11 +21,13 @@ __all__ = [
     "to_str",
     "write_file",
     "to_eularian_angles",
+    "to_eulerian_angles_vectorized",
     "to_quaternion",
     "wait_key",
     "read_pfm",
     "write_pfm",
     "write_png",
+    "sleep_sub_ms",
 ]
 
 
@@ -75,7 +79,8 @@ def write_file(filename, bstr):
 # https:#en.wikipedia.org/wiki/Conversion_between_quaternions_and_Euler_angles
 
 
-def to_eularian_angles(q):
+def to_eularian_angles(q: Quaternionr) -> np.ndarray:
+    """Convert a quaternion to euler angles (roll, pitch, yaw) in radians"""
     z = q.z_val
     y = q.y_val
     x = q.x_val
@@ -100,10 +105,15 @@ def to_eularian_angles(q):
     t4 = +1.0 - 2.0 * (ysqr + z * z)
     yaw = math.atan2(t3, t4)
 
-    return (pitch, roll, yaw)
+    return np.array([roll, pitch, yaw])
 
 
-def to_quaternion(pitch, roll, yaw):
+def to_eulerian_angles_vectorized(w, x, y, z) -> np.ndarray:
+    """Convert a quaternion to euler angles (roll, pitch, yaw) in radians"""
+    return R.from_quat([x, y, z, w]).as_euler("ZYX", degrees=False)[[2, 1, 0]]
+
+
+def to_quaternion(roll: float, pitch: float, yaw: float):
     t0 = math.cos(yaw * 0.5)
     t1 = math.sin(yaw * 0.5)
     t2 = math.cos(roll * 0.5)
@@ -259,3 +269,10 @@ def write_png(filename, image):
     )
 
     write_file(filename, png_bytes)
+
+
+def sleep_sub_ms(delay):
+    """Function to provide accurate time delay in seconds"""
+    end = time.perf_counter() + delay
+    while time.perf_counter() < end:
+        pass

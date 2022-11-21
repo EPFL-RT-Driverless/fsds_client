@@ -4,8 +4,10 @@ from typing import Callable, Optional
 
 import numpy as np
 from scipy.spatial.transform import Rotation as R
+
 from .low_level_client import LowLevelClient
 from .types import *
+from .utils import *
 
 __all__ = ["HighLevelClient"]
 
@@ -52,22 +54,29 @@ class HighLevelClient:
 
         crash_guard(self.client.restart, "restart")
 
-        sleep_sub_ms(3)
+        sleep_sub_ms(1)
 
-        # crash_guard(
-        #     lambda: self.client.enableApiControl(True),
-        #     "enableAPIControl",
-        #     self.client.restart,
-        # )
+        crash_guard(
+            lambda: self.client.enableApiControl(True),
+            "enableAPIControl",
+            self.client.restart,
+        )
 
         self.image = None
 
         self.state = None
 
-        self.update_state()
-        # self.state = self.client.simGetGroundTruthKinematics()
+        # self.update_state()
+        self.state = self.client.simGetGroundTruthKinematics()
 
     # utils ==================================================================
+
+    def set_api_control(self, flag: bool):
+        """
+        Enable or disable API control.
+        :param flag: True to enable, False to disable.
+        """
+        self.client.enableApiControl(flag)
 
     def available(self) -> bool:
         return self.client.ping()
@@ -81,14 +90,13 @@ class HighLevelClient:
         """Get the current state of the vehicle in the following order: [X,Y,phi,v_x,v_y,r]"""
         self.state = self.client.simGetGroundTruthKinematics()
         # position
-        x = self.state.position.x_val
-        y = self.state.position.y_val
+        x = -self.state.position.y_val
+        y = self.state.position.x_val
         # orientation
-        qx = self.state.orientation.x_val
-        qy = self.state.orientation.y_val
-        qz = self.state.orientation.z_val
-        qw = self.state.orientation.w_val
-        phi = np.mod(quaternion_to_euler(qw, qx, qy, qz)[2] + np.pi, 2 * np.pi) - np.pi
+        phi = (
+            np.mod(to_eularian_angles(self.state.orientation)[2] + np.pi, 2 * np.pi)
+            - np.pi
+        )
         # linear velocity
         v = np.hypot(self.state.linear_velocity.x_val, self.state.linear_velocity.y_val)
         angle_vx_vy = np.arctan2(
@@ -117,7 +125,7 @@ class HighLevelClient:
 
         self.client.setCarControls(car_controls)
 
-    def find_cones(
+    def find_cones_lidar(
         self, max_cone_distance: float = 20.0, max_group_dispersion: float = 0.2
     ) -> tuple[np.ndarray, np.ndarray]:
         """
@@ -130,36 +138,37 @@ class HighLevelClient:
             # not enough points
             return np.array([]), np.array([])
 
-        # Convert the list of floats into a list of xyz coordinates
+        # Convert the list of floats into a list of local XYZ coordinates (relative to
+        # the lidar pose)
         points = np.array(lidardata.point_cloud, dtype=np.dtype("f4"))
         points = np.reshape(points, (int(points.shape[0] / 3), 3))
-        # find altitude of the cones and discard those that are too low (below 0.05) or too high (above 0.7)
-        qx = lidardata.pose.orientation.x_val
-        qy = lidardata.pose.orientation.y_val
-        qz = lidardata.pose.orientation.z_val
-        qw = lidardata.pose.orientation.w_val
-        lidar_orientation = R.from_quat([qx, qy, qz, qw])
+
+        # discard the points that are too low, too high or too far away
+        roll_pitch_yaw = to_eularian_angles(lidardata.pose.orientation)
+        lidar_orientation = R.from_euler("ZYX", roll_pitch_yaw[::-1], degrees=False)
         altitudes = (
-            lidar_orientation.apply(points)[:, 2]
-            # R.from_quat([qx, qy, qz, qw]).inv().apply(points)[:, 2]
-            + lidardata.pose.position.z_val
+            lidar_orientation.inv().apply(points)[:, 2] + lidardata.pose.position.z_val
         )
-        print("min altitude: ", np.min(altitudes))
-        print("max altitude: ", np.max(altitudes))
         old_size = points.shape[0]
         points = points[
-            (altitudes > 0.1) & (altitudes < 0.7) & (np.linalg.norm(points, axis=1) < max_cone_distance)
+            (altitudes > 0.2)
+            & (altitudes < 0.5)
+            & (np.linalg.norm(points, axis=1) < max_cone_distance)
         ]
-        print("points removed: ", old_size - points.shape[0])
-        # only keep X and Y coordinates and discard the cones that are too far
         points = points[:, :2]
-        # points = points[np.linalg.norm(points, axis=1) < max_cone_distance]
 
         # Go through all the points and find nearby groups of points that are close
         # together as those will probably be cones.
         distances = np.sqrt(np.sum(np.square(np.diff(points, axis=0)), axis=1))
         groups = np.split(points, np.where(distances > max_group_dispersion)[0] + 1)
-        cones = np.array([np.mean(group, axis=0) for group in groups])
+        cones = []
+        for group in groups:
+            if np.max(np.abs(np.std(group, axis=0))) <= max_group_dispersion / np.sqrt(
+                len(group)
+            ):
+                cones.append(np.mean(group, axis=0))
+
+        cones = np.array(cones)
 
         return cones, points
 
@@ -182,38 +191,3 @@ class HighLevelClient:
         img_rgb = img1d.reshape((self.image.height, self.image.width, 3))
 
         return img_rgb
-
-
-def quaternion_to_euler(w, x, y, z):
-    """Convert a quaternion to euler angles (roll, pitch, yaw) in radians"""
-    # ysqr = y * y
-    #
-    # t0 = +2.0 * (w * x + y * z)
-    # t1 = +1.0 - 2.0 * (x * x + ysqr)
-    # roll = np.arctan2(t0, t1)
-    #
-    # t2 = +2.0 * (w * y - z * x)
-    # t2 = np.where(t2 > +1.0, +1.0, t2)
-    # # t2 = +1.0 if t2 > +1.0 else t2
-    #
-    # t2 = np.where(t2 < -1.0, -1.0, t2)
-    # # t2 = -1.0 if t2 < -1.0 else t2
-    # pitch = np.arcsin(t2)
-    #
-    # t3 = +2.0 * (w * z + x * y)
-    # t4 = +1.0 - 2.0 * (ysqr + z * z)
-    # yaw = np.arctan2(t3, t4)
-    # return roll, pitch, yaw
-
-    return R.from_quat([x, y, z, w]).as_euler("xyz", degrees=False)
-
-
-def sleep_sub_ms(delay):
-    """Function to provide accurate time delay in seconds"""
-    end = time.perf_counter() + delay
-    while time.perf_counter() < end:
-        pass
-
-
-def distance(x1, y1, x2, y2):
-    return np.sqrt(np.abs(x1 - x2) ** 2 + np.abs(y1 - y2) ** 2)
