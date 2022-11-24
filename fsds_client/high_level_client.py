@@ -90,8 +90,8 @@ class HighLevelClient:
         """Get the current state of the vehicle in the following order: [X,Y,phi,v_x,v_y,r]"""
         self.state = self.client.simGetGroundTruthKinematics()
         # position
-        x = -self.state.position.y_val
-        y = self.state.position.x_val
+        x = self.state.position.x_val
+        y = self.state.position.y_val
         # orientation
         phi = (
             np.mod(to_eularian_angles(self.state.orientation)[2] + np.pi, 2 * np.pi)
