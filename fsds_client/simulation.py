@@ -8,7 +8,9 @@ from .client import FSDSClient
 from .types import *
 
 
-def crash_guard(callback: Callable, error_message: str, aux: Optional[Callable] = None):
+def crash_guard(
+    callback: Callable, error_message: str, aux: Optional[Callable] = None
+):
     """
     Use this function to automatically restart the simulation if it crashes.
 
@@ -100,7 +102,9 @@ class Simulation:
 
         yaw = (
             np.mod(
-                np.arctan2(2 * (qw * qz + qx * qy), 1 - 2 * (qy * qy + qz * qz))
+                np.arctan2(
+                    2 * (qw * qz + qx * qy), 1 - 2 * (qy * qy + qz * qz)
+                )
                 + np.pi / 2
                 + np.pi,
                 2 * np.pi,
@@ -114,7 +118,8 @@ class Simulation:
         Speed of the vehicle in the referential of the track.
         """
         return np.hypot(
-            self.state.linear_velocity.x_val, self.state.linear_velocity.y_val
+            self.state.linear_velocity.x_val,
+            self.state.linear_velocity.y_val,
         )
 
     def speed_longitudinal(self) -> float:
@@ -122,7 +127,8 @@ class Simulation:
         Speed of the vehicle in the direction of the car.
         """
         angle_vx_vy = np.arctan2(
-            self.state.linear_velocity.x_val, -self.state.linear_velocity.y_val
+            self.state.linear_velocity.x_val,
+            -self.state.linear_velocity.y_val,
         )
         return self.speed() * np.cos(angle_vx_vy - self.yaw())
 
@@ -176,7 +182,10 @@ class Simulation:
 
             # Get the distance from current to previous point
             distance_to_last_point = distance(
-                points[i][0], points[i][1], points[i - 1][0], points[i - 1][1]
+                points[i][0],
+                points[i][1],
+                points[i - 1][0],
+                points[i - 1][1],
             )
 
             if distance_to_last_point < 0.1:
@@ -224,9 +233,10 @@ class Simulation:
         """
         car_controls = CarControls()
         car_controls.steering = self.calculate_steering(steering)
-        car_controls.throttle, car_controls.brake = self.calculate_throttle_brake(
-            throttle
-        )
+        (
+            car_controls.throttle,
+            car_controls.brake,
+        ) = self.calculate_throttle_brake(throttle)
         self.client.setCarControls(car_controls)
 
 
@@ -250,4 +260,3 @@ def pointgroup_to_cone(group):
     average_x = average_x / len(group)
     average_y = average_y / len(group)
     return np.array([average_x, average_y])
-

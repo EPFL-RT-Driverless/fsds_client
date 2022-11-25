@@ -88,7 +88,8 @@ class FSDSClient:
         """
         Returns true if API control is established.
 
-        If false (which is default) then API calls would be ignored. After a successful call to `enableApiControl`, `isApiControlEnabled` should return true.
+        If false (which is default) then API calls would be ignored.
+        After a successful call to `enableApiControl` , `isApiControlEnabled` should return true.
 
         Args:
             vehicle_name (str, optional): Name of the vehicle
@@ -121,7 +122,8 @@ class FSDSClient:
         See https://microsoft.github.io/AirSim/image_apis/ for details
 
         Args:
-            camera_name (str): Name of the camera, for backwards compatibility, ID numbers such as 0,1,etc. can also be used
+            camera_name (str): Name of the camera, for backwards compatibility,
+            ID numbers such as 0,1,etc. can also be used
             image_type (ImageType): Type of image required
             vehicle_name (str, optional): Name of the vehicle with the camera
 
@@ -132,7 +134,9 @@ class FSDSClient:
         camera_name = str(camera_name)
 
         # because this method returns std::vector<uint8>, msgpack decides to encode it as a string unfortunately.
-        result = self.client.call("simGetImage", camera_name, image_type, vehicle_name)
+        result = self.client.call(
+            "simGetImage", camera_name, image_type, vehicle_name
+        )
         if result == "" or result == "\0":
             return None
         return result
@@ -153,9 +157,12 @@ class FSDSClient:
         Returns:
             list[ImageResponse]:
         """
-        responses_raw = self.client.call("simGetImages", requests, vehicle_name)
+        responses_raw = self.client.call(
+            "simGetImages", requests, vehicle_name
+        )
         return [
-            ImageResponse.from_msgpack(response_raw) for response_raw in responses_raw
+            ImageResponse.from_msgpack(response_raw)
+            for response_raw in responses_raw
         ]
 
     def simGetGroundTruthKinematics(self, vehicle_name="FSCar"):
@@ -168,7 +175,9 @@ class FSDSClient:
         Returns:
             KinematicsState: Ground truth of the vehicle
         """
-        kinematics_state = self.client.call("simGetGroundTruthKinematics", vehicle_name)
+        kinematics_state = self.client.call(
+            "simGetGroundTruthKinematics", vehicle_name
+        )
         return KinematicsState.from_msgpack(kinematics_state)
 
     simGetGroundTruthKinematics.__annotations__ = {"return": KinematicsState}
@@ -189,7 +198,8 @@ class FSDSClient:
     def getImuData(self, imu_name="", vehicle_name="FSCar"):
         """
         Args:
-            imu_name (str, optional): Name of IMU to get data from, specified in settings.json. When no name is provided the last imu will be used.
+            imu_name (str, optional): Name of IMU to get data from, specified in settings.json.
+            When no name is provided the last imu will be used.
             vehicle_name (str, optional): Name of vehicle to which the sensor corresponds to
 
         Returns:
