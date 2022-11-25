@@ -88,7 +88,8 @@ class LowLevelClient:
         """
         Returns true if API control is established.
 
-        If false (which is default) then API calls would be ignored. After a successful call to `enableApiControl`, `isApiControlEnabled` should return true.
+        If false (which is default) then API calls would be ignored.
+        After a successful call to `enableApiControl` , `isApiControlEnabled` should return true.
 
         Args:
             vehicle_name (str, optional): Name of the vehicle
@@ -121,7 +122,8 @@ class LowLevelClient:
         See https://microsoft.github.io/AirSim/image_apis/ for details
 
         Args:
-            camera_name (str): Name of the camera, for backwards compatibility, ID numbers such as 0,1,etc. can also be used
+            camera_name (str): Name of the camera, for backwards compatibility,
+            ID numbers such as 0,1,etc. can also be used
             image_type (ImageType): Type of image required
             vehicle_name (str, optional): Name of the vehicle with the camera
 
@@ -189,7 +191,8 @@ class LowLevelClient:
     def getImuData(self, imu_name="", vehicle_name="FSCar"):
         """
         Args:
-            imu_name (str, optional): Name of IMU to get data from, specified in settings.json. When no name is provided the last imu will be used.
+            imu_name (str, optional): Name of IMU to get data from, specified in settings.json.
+            When no name is provided the last imu will be used.
             vehicle_name (str, optional): Name of vehicle to which the sensor corresponds to
 
         Returns:
