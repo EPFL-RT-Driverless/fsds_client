@@ -1,9 +1,9 @@
+import time
+from time import sleep
+
 import numpy as np
 
-from fsds_client import LowLevelClient
-from time import sleep
-import time
-import os
+from fsds_client import HighLevelClient
 
 HOST = "127.0.0.1"
 
@@ -14,20 +14,18 @@ HOST = "127.0.0.1"
 #
 # print("Using WSL2 Host IP address: ", HOST)
 
-simulation = LowLevelClient(ip=HOST)
+simulation = HighLevelClient(ip=HOST)
 sleep(2)
 simulation.client.enableApiControl(False),
 moy = np.array([])
 for i in range(100):
     start = time.time()
-    simulation.update_image()
     simulation.get_image()
     moy = np.append(moy, time.time() - start)
 print("Get image delay :", round(np.mean(moy) * 1000, 1), "ms")
 moy = np.array([])
 for i in range(100):
     start = time.time()
-    simulation.update_state()
-    simulation.get_states()
+    simulation.get_state()
     moy = np.append(moy, time.time() - start)
 print("Get state delay :", round(np.mean(moy) * 1000, 1), "ms")
