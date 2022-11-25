@@ -47,6 +47,24 @@ class FSDSClient:
 
         self.__init__(self.ip, self.port, self.timeout_value)
 
+    def getMapName(self) -> str:
+        """
+        Get current map name
+        """
+        map_name = self.client.call("getMap")
+        if map_name == "":
+            print("Error : not running custom map")
+        return map_name
+
+    def simPause(self, is_paused):
+        """
+        Pause simulation
+
+        Args:
+            is_paused (bool): True to pause, False to unpause
+        """
+        self.client.call("simPause", is_paused)
+
     def ping(self):
         """
         If connection is established then this call will return true otherwise it will be blocked until timeout
