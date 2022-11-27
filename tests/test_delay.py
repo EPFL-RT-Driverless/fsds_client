@@ -23,22 +23,22 @@ moy = np.array([])
 print(simulation.client.getMapName())
 
 for i in range(100):
-    start = time.time()
+    start = time.perf_counter()
     simulation.get_image()
-    moy = np.append(moy, time.time() - start)
+    moy = np.append(moy, time.perf_counter() - start)
 print("Get image delay :", round(np.mean(moy) * 1000, 1), "ms")
 moy = np.array([])
 for i in range(100):
-    start = time.time()
+    start = time.perf_counter()
     simulation.get_state()
-    moy = np.append(moy, time.time() - start)
+    moy = np.append(moy, time.perf_counter() - start)
 print("Get state delay :", round(np.mean(moy) * 1000, 1), "ms")
 
 moy = np.array([])
 for i in range(100):
-    start = time.time()
-    simulation.find_cones()
-    moy = np.append(moy, time.time() - start)
+    start = time.perf_counter()
+    simulation.find_cones_lidar()
+    moy = np.append(moy, time.perf_counter() - start)
 print("Get lidar delay :", round(np.mean(moy) * 1000, 1), "ms")
 
 simulation.client.simPause(True)

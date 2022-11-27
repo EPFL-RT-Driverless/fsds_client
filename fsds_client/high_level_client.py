@@ -149,7 +149,6 @@ class HighLevelClient:
         altitudes = (
             lidar_orientation.inv().apply(points)[:, 2] + lidardata.pose.position.z_val
         )
-        old_size = points.shape[0]
         points = points[
             (altitudes > 0.2)
             & (altitudes < 0.5)
@@ -171,6 +170,9 @@ class HighLevelClient:
         cones = np.array(cones)
 
         return cones, points
+
+    def find_cones(self):
+        raise NotImplementedError
 
     def get_image(self) -> np.ndarray:
         """
