@@ -193,3 +193,11 @@ class HighLevelClient:
         img_rgb = img1d.reshape((self.image.height, self.image.width, 3))
 
         return img_rgb
+
+    def get_wheels_speed(self):
+        front_left = self.client.simGetWheelStates().fl_rpm
+        front_right = self.client.simGetWheelStates().fr_rpm
+        rear_left = self.client.simGetWheelStates().rl_rpm
+        rear_right = self.client.simGetWheelStates().rr_rpm
+
+        return np.array([front_left, front_right, rear_left, rear_right])

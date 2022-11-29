@@ -56,6 +56,20 @@ class LowLevelClient:
             print("Error : not running custom map")
         return map_name
 
+    def simGetWheelStates(self, vehicle_name="FSCar") -> WheelStates:
+        """
+        Get wheel states of the vehicle
+
+        Args:
+            vehicle_name (str, optional): Name of the vehicle
+
+        Returns:
+            WheelStates: Wheel states of the vehicle
+        """
+        return WheelStates.from_msgpack(
+            self.client.call("simGetWheelStates", vehicle_name)
+        )
+
     def simPause(self, is_paused):
         """
         Pause simulation
