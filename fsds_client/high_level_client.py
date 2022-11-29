@@ -201,3 +201,6 @@ class HighLevelClient:
         rear_right = self.client.simGetWheelStates().rr_rpm
 
         return np.array([front_left, front_right, rear_left, rear_right])
+
+    def get_map_name(self) -> str:
+        return self.client.getMapName()

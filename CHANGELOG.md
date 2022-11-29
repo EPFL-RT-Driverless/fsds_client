@@ -1,3 +1,7 @@
+# v2.0.3
+- added `get_wheels_speed()` : a method to get the rpm of each wheel
+- added `get_map_name()` : a method to get the current track name
+
 # v2.0.2
 
 :bug: added `sleep_sub_ms()` call to avoid erros in `enableApiControl`
