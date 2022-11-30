@@ -115,9 +115,12 @@ class HighLevelClient:
         :param delta: Steering angle in radians between -max_steering and max_steering.
         """
         car_controls = CarControls()
-        car_controls.steering = -delta / np.deg2rad(
-            self._delta_max
+        car_controls.steering = (
+            -delta / self._delta_max
         )  # delta is anti-clockwise but steering is clockwise
+        print("sent steering command =", car_controls.steering)
+        car_controls.throttle = T
+        car_controls.brake = 0
         if T > 0:
             car_controls.throttle, car_controls.brake = T, 0
         else:
