@@ -118,9 +118,6 @@ class HighLevelClient:
         car_controls.steering = (
             -delta / self._delta_max
         )  # delta is anti-clockwise but steering is clockwise
-        print("sent steering command =", car_controls.steering)
-        car_controls.throttle = T
-        car_controls.brake = 0
         if T > 0:
             car_controls.throttle, car_controls.brake = T, 0
         else:
