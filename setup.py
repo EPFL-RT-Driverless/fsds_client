@@ -14,7 +14,7 @@ with open("requirements.txt", "r") as fh:
 
 setup(
     name="fsds_client",
-    version="2.0.3",
+    version="3.0.0",
     description="Simple Python client for FSDS simulation",
     long_description=long_description,
     url="https://github.com/EPFL-RT-Driverless/fsds_client",
