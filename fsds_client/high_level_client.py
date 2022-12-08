@@ -200,7 +200,6 @@ class HighLevelClient:
             )
         )
         # only keep the cones that are in front of the car and at less that 12m
-        print(polar)
         polar = polar[
             (-np.pi / 2 <= polar[:, 1])
             & (polar[:, 1] <= np.pi / 2)
