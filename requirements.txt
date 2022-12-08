@@ -3,4 +3,4 @@
 numpy
 scipy~=1.8.0
 msgpack-rpc-python
--e git+https://github.com/EPFL-RT-Driverless/track_database.git@v3.0.0#egg=track_database
+-e git+https://github.com/EPFL-RT-Driverless/track_database.git@v3.0.1#egg=track_database

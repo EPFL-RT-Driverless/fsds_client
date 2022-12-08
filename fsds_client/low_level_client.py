@@ -1,6 +1,4 @@
 # Copyright (c) 2022 Mattéo Berthet, EPFL Racing Team Driverless
-from __future__ import print_function
-
 import time
 
 import msgpackrpc

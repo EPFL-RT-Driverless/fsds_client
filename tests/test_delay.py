@@ -17,10 +17,10 @@ HOST = "127.0.0.1"
 
 simulation = HighLevelClient(ip=HOST)
 sleep(2)
-simulation.client.enableApiControl(False),
+simulation.low_level_client.enableApiControl(False),
 moy = np.array([])
 
-print(simulation.client.getMapName())
+print(simulation.low_level_client.getMapName())
 
 for i in range(100):
     start = time.perf_counter()
@@ -41,8 +41,8 @@ for i in range(100):
     moy = np.append(moy, time.perf_counter() - start)
 print("Get lidar delay :", round(np.mean(moy) * 1000, 1), "ms")
 
-simulation.client.simPause(True)
+simulation.low_level_client.simPause(True)
 sleep_sub_ms(0.01)
-simulation.client.simPause(False)
+simulation.low_level_client.simPause(False)
 
 sleep(20)

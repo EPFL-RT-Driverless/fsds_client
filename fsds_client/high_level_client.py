@@ -8,6 +8,7 @@ from scipy.spatial.transform import Rotation as R
 from .low_level_client import LowLevelClient
 from .types import *
 from .utils import *
+import track_database as tdb
 
 __all__ = ["HighLevelClient"]
 
@@ -40,6 +41,12 @@ def crash_guard(callback: Callable, error_message: str, aux: Optional[Callable] 
 
 class HighLevelClient:
     _delta_max: float = np.deg2rad(35.0)
+    camera_name: str
+    low_level_client: LowLevelClient
+    track: tdb.Track
+    cones_positions: np.ndarray
+    state: KinematicsState
+    image: Optional[ImageResponse]
 
     def __init__(
         self,
@@ -47,27 +54,23 @@ class HighLevelClient:
         camera_name: str = "examplecam",
     ):
         self.camera_name = camera_name
-
-        self.client = LowLevelClient(ip, 41451, 3)
-
-        crash_guard(self.client.confirmConnection, "confirmConnection")
-
-        crash_guard(self.client.restart, "restart")
-
+        self.low_level_client = LowLevelClient(ip, 41451, 3)
+        crash_guard(self.low_level_client.confirmConnection, "confirmConnection")
+        crash_guard(self.low_level_client.restart, "restart")
         sleep_sub_ms(1)
-
         crash_guard(
-            lambda: self.client.enableApiControl(True),
+            lambda: self.low_level_client.enableApiControl(True),
             "enableAPIControl",
-            self.client.restart,
+            self.low_level_client.restart,
         )
-
         self.image = None
-
-        self.state = None
-
-        # self.update_state()
-        self.state = self.client.simGetGroundTruthKinematics()
+        map_name = self.get_map_name().removesuffix("_cones")
+        assert map_name in tdb.available_tracks, f"Map {map_name} not available"
+        self.track = tdb.load_track(map_name)
+        self.state = self.low_level_client.simGetGroundTruthKinematics()
+        self.cones_positions = np.vstack(
+            (self.track.right_cones, self.track.left_cones)
+        )
 
     # utils ==================================================================
 
@@ -76,19 +79,19 @@ class HighLevelClient:
         Enable or disable API control.
         :param flag: True to enable, False to disable.
         """
-        self.client.enableApiControl(flag)
+        self.low_level_client.enableApiControl(flag)
 
     def available(self) -> bool:
-        return self.client.ping()
+        return self.low_level_client.ping()
 
     def update_state(self):
         """Get the current state of the vehicle"""
-        self.state = self.client.simGetGroundTruthKinematics()
+        self.state = self.low_level_client.simGetGroundTruthKinematics()
 
     # interact with the simulation ===========================================
     def get_state(self) -> np.ndarray:
         """Get the current state of the vehicle in the following order: [X,Y,phi,v_x,v_y,r]"""
-        self.state = self.client.simGetGroundTruthKinematics()
+        self.state = self.low_level_client.simGetGroundTruthKinematics()
         # position
         x = self.state.position.x_val
         y = self.state.position.y_val
@@ -123,7 +126,7 @@ class HighLevelClient:
         else:
             car_controls.throttle, car_controls.brake = 0, T
 
-        self.client.setCarControls(car_controls)
+        self.low_level_client.setCarControls(car_controls)
 
     def find_cones_lidar(
         self, max_cone_distance: float = 20.0, max_group_dispersion: float = 0.2
@@ -131,9 +134,10 @@ class HighLevelClient:
         """
         Simple lidar cone detection algorithm that returns the positions of the cones in
         a local cartesian frame, i.e. X is forward, Y is left.
+        :returns: cones_positions and raw 2D point cloud, all in local cartesian coordinates.
         """
         # Get the pointcloud
-        lidardata = self.client.getLidarData()
+        lidardata = self.low_level_client.getLidarData()
         if len(lidardata.point_cloud) < 3:
             # not enough points
             return np.array([]), np.array([])
@@ -171,15 +175,60 @@ class HighLevelClient:
 
         return cones, points
 
-    def find_cones(self):
-        raise NotImplementedError
+    def find_cones(
+        self,
+        state: np.ndarray,
+        noise_cov: np.ndarray = np.diag([0.0, 0.0]),
+        max_distance: float = 20.0,
+        coords_type: str = "polar",
+    ) -> np.ndarray:
+        assert coords_type in [
+            "polar",
+            "cartesian",
+        ], "coords_type must be polar or cartesian"
+        cartesian = (self.cones_positions - state[:2]) @ np.array(
+            [
+                [np.cos(-state[2]), -np.sin(-state[2])],
+                [np.sin(-state[2]), np.cos(-state[2])],
+            ]
+        ).T
+        # transform to polar coordinates
+        polar = np.hstack(
+            (
+                np.hypot(cartesian[:, 0], cartesian[:, 1])[:, np.newaxis],
+                np.arctan2(cartesian[:, 1], cartesian[:, 0])[:, np.newaxis],
+            )
+        )
+        # only keep the cones that are in front of the car and at less that 12m
+        print(polar)
+        polar = polar[
+            (-np.pi / 2 <= polar[:, 1])
+            & (polar[:, 1] <= np.pi / 2)
+            & (polar[:, 0] <= max_distance),
+            :,
+        ]
+
+        # add noise to the polar coordinates
+        polar += np.random.multivariate_normal(
+            np.zeros(2), noise_cov, size=polar.shape[0]
+        )
+        if coords_type == "polar":
+            return polar
+        else:
+            cartesian = np.hstack(
+                (
+                    np.expand_dims(polar[:, 0] * np.cos(polar[:, 1]), 1),
+                    np.expand_dims(polar[:, 0] * np.sin(polar[:, 1]), 1),
+                )
+            )
+            return cartesian
 
     def get_image(self) -> np.ndarray:
         """
         Get the current image from the camera.
         :return: The image as a numpy array of shape (height, width, 3).
         """
-        [self.image] = self.client.simGetImages(
+        [self.image] = self.low_level_client.simGetImages(
             [
                 ImageRequest(
                     camera_name=self.camera_name,
@@ -195,12 +244,12 @@ class HighLevelClient:
         return img_rgb
 
     def get_wheels_speed(self):
-        front_left = self.client.simGetWheelStates().fl_rpm
-        front_right = self.client.simGetWheelStates().fr_rpm
-        rear_left = self.client.simGetWheelStates().rl_rpm
-        rear_right = self.client.simGetWheelStates().rr_rpm
+        front_left = self.low_level_client.simGetWheelStates().fl_rpm
+        front_right = self.low_level_client.simGetWheelStates().fr_rpm
+        rear_left = self.low_level_client.simGetWheelStates().rl_rpm
+        rear_right = self.low_level_client.simGetWheelStates().rr_rpm
 
         return np.array([front_left, front_right, rear_left, rear_right])
 
     def get_map_name(self) -> str:
-        return self.client.getMapName()
+        return self.low_level_client.getMapName()
