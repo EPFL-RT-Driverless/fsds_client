@@ -1,16 +1,14 @@
 # Copyright (c) 2022 Mattéo Berthet, EPFL Racing Team Driverless
-from __future__ import print_function
-
 import time
 
 import msgpackrpc
 
 from .types import *
 
-__all__ = ["FSDSClient"]
+__all__ = ["LowLevelClient"]
 
 
-class FSDSClient:
+class LowLevelClient:
     def __init__(self, ip="", port=41451, timeout_value=5):
         self.ip = ip
         self.port = port
@@ -47,6 +45,38 @@ class FSDSClient:
 
         self.__init__(self.ip, self.port, self.timeout_value)
 
+    def getMapName(self) -> str:
+        """
+        Get current map name
+        """
+        map_name = self.client.call("getMap")
+        if map_name == "":
+            print("Error : not running custom map")
+        return map_name
+
+    def simGetWheelStates(self, vehicle_name="FSCar") -> WheelStates:
+        """
+        Get wheel states of the vehicle
+
+        Args:
+            vehicle_name (str, optional): Name of the vehicle
+
+        Returns:
+            WheelStates: Wheel states of the vehicle
+        """
+        return WheelStates.from_msgpack(
+            self.client.call("simGetWheelStates", vehicle_name)
+        )
+
+    def simPause(self, is_paused):
+        """
+        Pause simulation
+
+        Args:
+            is_paused (bool): True to pause, False to unpause
+        """
+        self.client.call("simPause", is_paused)
+
     def ping(self):
         """
         If connection is established then this call will return true otherwise it will be blocked until timeout
@@ -70,7 +100,8 @@ class FSDSClient:
         """
         Returns true if API control is established.
 
-        If false (which is default) then API calls would be ignored. After a successful call to `enableApiControl`, `isApiControlEnabled` should return true.
+        If false (which is default) then API calls would be ignored.
+        After a successful call to `enableApiControl` , `isApiControlEnabled` should return true.
 
         Args:
             vehicle_name (str, optional): Name of the vehicle
@@ -103,7 +134,8 @@ class FSDSClient:
         See https://microsoft.github.io/AirSim/image_apis/ for details
 
         Args:
-            camera_name (str): Name of the camera, for backwards compatibility, ID numbers such as 0,1,etc. can also be used
+            camera_name (str): Name of the camera, for backwards compatibility,
+            ID numbers such as 0,1,etc. can also be used
             image_type (ImageType): Type of image required
             vehicle_name (str, optional): Name of the vehicle with the camera
 
@@ -171,7 +203,8 @@ class FSDSClient:
     def getImuData(self, imu_name="", vehicle_name="FSCar"):
         """
         Args:
-            imu_name (str, optional): Name of IMU to get data from, specified in settings.json. When no name is provided the last imu will be used.
+            imu_name (str, optional): Name of IMU to get data from, specified in settings.json.
+            When no name is provided the last imu will be used.
             vehicle_name (str, optional): Name of vehicle to which the sensor corresponds to
 
         Returns:

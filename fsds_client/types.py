@@ -25,6 +25,7 @@ __all__ = [
     "GnssReport",
     "GpsData",
     "GroundSpeedSensorData",
+    "WheelStates",
 ]
 
 
@@ -62,6 +63,52 @@ class ImageType:
     Segmentation = 5
     SurfaceNormals = 6
     Infrared = 7
+
+
+class WheelStates(MsgpackMixin):
+    time_stamp = np.uint64(0)
+    fl_rpm = 0.0
+    fr_rpm = 0.0
+    rl_rpm = 0.0
+    rr_rpm = 0.0
+    fl_rotation_angle = 0.0
+    fr_rotation_angle = 0.0
+    rl_rotation_angle = 0.0
+    rr_rotation_angle = 0.0
+    fl_steering_angle = 0.0
+    fr_steering_angle = 0.0
+    rl_steering_angle = 0.0
+    rr_steering_angle = 0.0
+
+    def __init__(
+        self,
+        time_stamp=0,
+        fl_rpm=0.0,
+        fr_rpm=0.0,
+        rl_rpm=0.0,
+        rr_rpm=0.0,
+        fl_rotation_angle=0.0,
+        fr_rotation_angle=0.0,
+        rl_rotation_angle=0.0,
+        rr_rotation_angle=0.0,
+        fl_steering_angle=0.0,
+        fr_steering_angle=0.0,
+        rl_steering_angle=0.0,
+        rr_steering_angle=0.0,
+    ):
+        self.time_stamp = time_stamp
+        self.fl_rpm = fl_rpm
+        self.fr_rpm = fr_rpm
+        self.rl_rpm = rl_rpm
+        self.rr_rpm = rr_rpm
+        self.fl_rotation_angle = fl_rotation_angle
+        self.fr_rotation_angle = fr_rotation_angle
+        self.rl_rotation_angle = rl_rotation_angle
+        self.rr_rotation_angle = rr_rotation_angle
+        self.fl_steering_angle = fl_steering_angle
+        self.fr_steering_angle = fr_steering_angle
+        self.rl_steering_angle = rl_steering_angle
+        self.rr_steering_angle = rr_steering_angle
 
 
 class Vector3r(MsgpackMixin):
