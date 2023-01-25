@@ -1,3 +1,7 @@
+# v3.0.1
+
+added `COLCON_IGNORE` file to ignore this package in colcon builds (for brains repo)
+
 # v3.0.0
 Added several new features (mostly based on compatibility with the latest
 release of FSDS) and bug fixes:
