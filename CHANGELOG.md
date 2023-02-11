@@ -1,3 +1,11 @@
+# v3.0.2
+
+- added `COLCON_IGNORE` file to ignore this package in colcon builds (for brains repo)
+- updated msgpack rpc dep to new package [rpc-msgpack](https://pypi.org/project/rpc-msgpack/)
+  that is compatible with latest versions of tornado 
+  ([msgpack-rpc-python](https://pypi.org/project/msgpack-rpc-python/) 
+  was not), which is nice for other dependencies that might need tornado (like jupyter).
+
 # v3.0.1
 
 added `COLCON_IGNORE` file to ignore this package in colcon builds (for brains repo)
