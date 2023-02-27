@@ -1,11 +1,15 @@
+from io import BytesIO
 import json
 import os
+import time
 import warnings
 from functools import cached_property
 from typing import Optional, Callable, Union, Type
 
 import msgpackrpc
 import numpy as np
+from PIL import Image
+
 
 import track_database as tdb
 from .types import *
@@ -22,6 +26,14 @@ _SENSOR_TYPES = {
     8: ImageResponse,
     9: WheelStates,
 }
+
+# def png_byte_string_to_numpy_array(png_byte_string):
+#     """
+#     Converts a png byte string to a numpy array
+#     """
+#     import png
+
+#     return np.array(png.Reader(bytes=png_byte_string).asDirect()[2])
 
 
 class FSDSClient:
@@ -186,10 +198,10 @@ class FSDSClient:
         self._all_cones = np.vstack((self.track.right_cones, self.track.left_cones))
 
     @property
-    def car_names(self):
+    def car_names(self) -> list[str]:
         return list(self._data.keys())
 
-    def camera_names(self, car_name: Optional[str] = None):
+    def camera_names(self, car_name: Optional[str] = None) -> list[str]:
         if car_name is None:
             car_name = self.default_car_name
         return filter(
@@ -256,7 +268,7 @@ class FSDSClient:
         self._setup_client()
 
     @cached_property
-    def map_name(self):
+    def map_name(self) -> str:
         """Returns the name of the current map, which does not change during the simulation lifetime."""
         # return self.rpc_client.call("getMap")
         return self._try_and_fail(
@@ -288,6 +300,7 @@ class FSDSClient:
             self._data[car_name]["state"] = KinematicsState.from_msgpack(
                 self.rpc_client.call("simGetGroundTruthKinematics", car_name)
             )
+            timestamp = time.time_ns()
             state = self._data[car_name]["state"]
 
             # position
@@ -311,7 +324,7 @@ class FSDSClient:
 
             return (
                 np.array([x, y, phi, v_x, v_y, r]),
-                state.time_stamp,
+                np.uint64(timestamp),
             )
 
         return self._try_and_fail(bruh, "Failed to get state")
@@ -382,8 +395,14 @@ class FSDSClient:
         )
 
     def get_image(
-        self, camera_names: list[str] = [], car_name: Optional[str] = None
-    ) -> list[np.ndarray, np.uint64]:
+        self,
+        camera_names: list[str] = [],
+        car_name: Optional[str] = None,
+        compressed: bool = False,
+    ) -> list[tuple[np.ndarray, np.uint64]]:
+        if compressed:
+            raise NotImplementedError("Compressed images not implemented yet")
+        
         if car_name is None:
             car_name = self.default_car_name
 
@@ -394,7 +413,7 @@ class FSDSClient:
                 and self._data_types[car_name][camera_name] == ImageResponse
             ), f"Camera {camera_name} not found"
 
-        def bruh():
+        def bruh() -> list[tuple[np.ndarray, np.uint64]]:
             responses = [
                 ImageResponse.from_msgpack(response)
                 for response in self.rpc_client.call(
@@ -403,7 +422,8 @@ class FSDSClient:
                         ImageRequest(
                             camera_name=camera_name,
                             image_type=ImageType.Scene,
-                            compress=False,
+                            compress=compressed,
+                            pixels_as_float=compressed,
                         )
                         for camera_name in camera_names
                     ],
@@ -413,13 +433,12 @@ class FSDSClient:
             for i, camera_name in enumerate(camera_names):
                 self._data[car_name][camera_name] = responses[i]
 
-            # TODO: should we use fromstring or frombuffer?
             return [
                 (
-                    np.fromstring(response.image_data_uint8, dtype=np.uint8).reshape(
-                        (response.height, response.width, 3)
-                    ),
-                    response.timestamp,
+                    np.frombuffer(
+                        response.image_data_uint8, dtype=np.uint8
+                    ).reshape((response.height, response.width, 3)),
+                    response.time_stamp,
                 )
                 for response in responses
             ]
@@ -461,31 +480,31 @@ class FSDSClient:
             car_name = self.default_car_name
 
         assert (
-            "imu_data" in self._data[car_name].keys()
-            and self._data_types[car_name]["imu_data"] == ImuData
-        ), f"IMU {imu_name} not found"
+            imu_name in self._data[car_name].keys()
+            and self._data_types[car_name][imu_name] == ImuData
+        ), f'IMU "{imu_name}" not found'
 
         def bruh():
-            self._data[car_name]["imu_data"] = ImuData.from_msgpack(
-                self.rpc_client.call("getImuData", car_name)
+            self._data[car_name][imu_name] = ImuData.from_msgpack(
+                self.rpc_client.call("getImuData", imu_name, car_name)
             )
             return (
                 np.array(
                     [
                         np.mod(
                             to_eularian_angles(
-                                self._data[car_name]["imu_data"].orientation
+                                self._data[car_name][imu_name].orientation
                             )[2]
                             + np.pi,
                             2 * np.pi,
                         )
                         - np.pi,
-                        self._data[car_name]["imu_data"].linear_acceleration.x_val,
-                        self._data[car_name]["imu_data"].linear_acceleration.y_val,
-                        self._data[car_name]["imu_data"].angular_velocity.z_val,
+                        self._data[car_name][imu_name].linear_acceleration.x_val,
+                        self._data[car_name][imu_name].linear_acceleration.y_val,
+                        self._data[car_name][imu_name].angular_velocity.z_val,
                     ]
                 ),
-                self._data[car_name]["imu_data"].time_stamp,
+                self._data[car_name][imu_name].time_stamp,
             )
 
         return self._try_and_fail(
@@ -493,28 +512,30 @@ class FSDSClient:
             f"Failed to get IMU data from {imu_name} on car {car_name}",
         )
 
-    def get_gss_data(self, gss_name: str, car_name: Optional[str] = None):
+    def get_gss_data(
+        self, gss_name: str, car_name: Optional[str] = None
+    ) -> tuple[np.ndarray, np.uint64]:
         """Get GSS data as (vx, vy)"""
         if car_name is None:
             car_name = self.default_car_name
 
         assert (
-            "gss_data" in self._data[car_name].keys()
-            and self._data_types[car_name]["gss_data"] == GpsData
+            gss_name in self._data[car_name].keys()
+            and self._data_types[car_name][gss_name] == GroundSpeedSensorData
         ), f"GSS {gss_name} not found"
 
-        def bruh():
-            self._data[car_name]["gss_data"] = GroundSpeedSensorData.from_msgpack(
-                self.rpc_client.call("getGpsData", car_name)
+        def bruh() -> tuple[np.ndarray, np.uint64]:
+            self._data[car_name][gss_name] = GroundSpeedSensorData.from_msgpack(
+                self.rpc_client.call("getGroundSpeedSensorData", car_name)
             )
             return (
                 np.array(
                     [
-                        self._data[car_name]["gss_data"].linear_velocity.x_val,
-                        self._data[car_name]["gss_data"].linear_velocity.y_val,
+                        self._data[car_name][gss_name].linear_velocity.x_val,
+                        self._data[car_name][gss_name].linear_velocity.y_val,
                     ]
                 ),
-                self._data[car_name]["gss_data"].time_stamp,
+                self._data[car_name][gss_name].time_stamp,
             )
 
         return self._try_and_fail(
@@ -522,21 +543,26 @@ class FSDSClient:
             "Failed to get GSS data",
         )
 
-    def get_gps_data(self, gps_name: str, car_name: Optional[str] = None) -> GpsData:
+    def get_gps_data(
+        self, gps_name: str, car_name: Optional[str] = None
+    ) -> tuple[GpsData, np.uint64]:
         """Get GPS data as (lat, lon)"""
         if car_name is None:
             car_name = self.default_car_name
 
         assert (
-            "gps_data" in self._data[car_name].keys()
-            and self._data_types[car_name]["gps_data"] == GpsData
+            gps_name in self._data[car_name].keys()
+            and self._data_types[car_name][gps_name] == GpsData
         ), f"GPS {gps_name} not found"
 
-        def bruh():
-            self._data[car_name]["gps_data"] = GpsData.from_msgpack(
-                self.rpc_client.call("getGpsData", car_name)
+        def bruh() -> tuple[GpsData, np.uint64]:
+            self._data[car_name][gps_name] = GpsData.from_msgpack(
+                self.rpc_client.call("getGpsData", gps_name, car_name)
             )
-            return self._data[car_name]["gps_data"]
+            return (
+                self._data[car_name][gps_name],
+                self._data[car_name][gps_name].time_stamp,
+            )
 
         return self._try_and_fail(
             bruh,
