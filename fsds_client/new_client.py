@@ -1,18 +1,27 @@
+import json
+import os
 import warnings
-from typing import Optional, Callable, Union
+from functools import cached_property
+from typing import Optional, Callable, Union, Type
 
 import msgpackrpc
 import numpy as np
 
+import track_database as tdb
 from .types import *
 from .utils import *
-from functools import cached_property
-import track_database as tdb
-
-import json
-import os
 
 __all__ = ["FSDSClient"]
+
+
+_SENSOR_TYPES = {
+    2: ImuData,
+    3: GpsData,
+    6: LidarData,
+    7: GroundSpeedSensorData,
+    8: ImageResponse,
+    9: WheelStates,
+}
 
 
 class FSDSClient:
@@ -51,13 +60,26 @@ class FSDSClient:
             ],
         ],
     ]
-
-    _state: KinematicsState
-    _yaw: float
-    _control: CarControls
-    _images: dict[str, ImageResponse]
-    _point_cloud: LidarData
-    _cones_observations: np.ndarray
+    _data_types: dict[
+        str,
+        dict[
+            str,
+            Type[
+                Union[
+                    float,
+                    np.ndarray,
+                    KinematicsState,
+                    CarControls,
+                    ImageResponse,
+                    LidarData,
+                    ImuData,
+                    GpsData,
+                    GroundSpeedSensorData,
+                    WheelStates,
+                ]
+            ],
+        ],
+    ]
     _all_cones: np.ndarray
 
     def __init__(
@@ -66,7 +88,7 @@ class FSDSClient:
         port=41451,
         timeout_value=3,
         api_control=True,
-        default_car_name="FSCar",
+        default_car_name="FSDSCar",
         delta_max: float = np.deg2rad(45.0),
         cones_range_limits: Union[float, tuple[float]] = (0.0, 100.0),
         cones_bearing_limits: Union[float, tuple[float]] = (-np.pi, np.pi),
@@ -86,19 +108,56 @@ class FSDSClient:
             + "/Formula-Student-Driverless-Simulator/settings.json"
         ) as f:
             settings = json.load(f)
-            self._data = {
-                car_name: {
-                    sensor_name: None
-                    for sensor_name in settings["Vehicles"][car_name]["Sensors"].keys()
-                    if settings["Vehicles"][car_name]["Sensors"][sensor_name]["Enabled"]
-                }
-                | {
-                    camera_name: ImageResponse()
-                    for camera_name in settings["Vehicles"][car_name]["Cameras"].keys()
-                }
-                | {"yaw": 0.0}
-                for car_name in settings["Vehicles"].keys()
-            }
+            self._data = {}
+            self._data_types = {}
+            for car_name in settings["Vehicles"].keys():
+                self._data[car_name] = {}
+                self._data_types[car_name] = {}
+                for sensor_name in settings["Vehicles"][car_name]["Sensors"].keys():
+                    if settings["Vehicles"][car_name]["Sensors"][sensor_name][
+                        "Enabled"
+                    ]:
+                        self._data_types[car_name][sensor_name] = _SENSOR_TYPES[
+                            settings["Vehicles"][car_name]["Sensors"][sensor_name][
+                                "SensorType"
+                            ]
+                        ]
+                        self._data[car_name][sensor_name] = self._data_types[car_name][
+                            sensor_name
+                        ]()
+
+                for camera_name in settings["Vehicles"][car_name]["Cameras"].keys():
+                    self._data_types[car_name][camera_name] = ImageResponse
+                    self._data[car_name][camera_name] = ImageResponse()
+
+                self._data_types[car_name]["state"] = KinematicsState
+                self._data[car_name]["state"] = KinematicsState()
+                self._data_types[car_name]["control"] = CarControls
+                self._data[car_name]["control"] = CarControls()
+                self._data_types[car_name]["yaw"] = float
+                self._data[car_name]["yaw"] = 0.0
+                self._data_types[car_name]["cones_observations"] = np.ndarray
+                self._data[car_name]["cones_observations"] = np.empty((0, 2))
+
+            # self._data = {
+            #     car_name: {
+            #         sensor_name: None
+            #         for sensor_name in settings["Vehicles"][car_name]["Sensors"].keys()
+            #         if settings["Vehicles"][car_name]["Sensors"][sensor_name]["Enabled"]
+            #     }
+            #     | {
+            #         camera_name: ImageResponse()
+            #         for camera_name in settings["Vehicles"][car_name]["Cameras"].keys()
+            #     }
+            #     | {
+            #         "state": KinematicsState(),
+            #         "control": CarControls(),
+            #         "yaw": 0.0,
+            #         "cones_observations": np.empty((0, 2)),
+            #     }
+            #     for car_name in settings["Vehicles"].keys()
+            # }
+
             assert (
                 default_car_name in self._data.keys()
             ), "The main car name must be one of the following: " + ", ".join(
@@ -118,13 +177,7 @@ class FSDSClient:
             else (-cones_bearing_limits, cones_bearing_limits)
         )
 
-        self.api_control = api_control
-        self._state = KinematicsState()
-        self._control = CarControls()
-        self._point_cloud = LidarData()
-        self._cones_observations = np.empty((0, 2))
-        self._images = {}
-
+        self.set_api_control(api_control)
         map_name = self.map_name
         assert (
             map_name in tdb.available_tracks
@@ -135,6 +188,14 @@ class FSDSClient:
     @property
     def car_names(self):
         return list(self._data.keys())
+
+    def camera_names(self, car_name: Optional[str] = None):
+        if car_name is None:
+            car_name = self.default_car_name
+        return filter(
+            lambda k: self._data_types[car_name][k] == ImageResponse,
+            self._data[car_name].keys(),
+        )
 
     def _try_until_success(
         self,
@@ -182,7 +243,7 @@ class FSDSClient:
             "Failed to setup client",
         )
 
-    def ping(self):
+    def ping(self) -> bool:
         return self.rpc_client.call("ping")
 
     def _confirm_connection(self):
@@ -203,75 +264,90 @@ class FSDSClient:
             "Failed to get map name",
         )
 
-    @property
-    def api_control(self):
-        return self.rpc_client.call("isApiControlEnabled", "FSCar")
-
-    @api_control.setter
-    def api_control(self, is_enabled):
-        self._try_until_success(
-            lambda: self.rpc_client.call("enableApiControl", is_enabled, self.car_name),
-            "Failed to set API control to " + str(is_enabled),
-            self.restart,  # if we do not restart, the same request will keep on failing
+    def get_api_control(self, car_name: Optional[str] = None) -> bool:
+        if car_name is None:
+            car_name = self.default_car_name
+        return self._try_and_fail(
+            lambda: self.rpc_client.call("isApiControlEnabled", car_name),
+            "Failed to get API control",
         )
 
-    @property
-    def state(self):
-        def update_state():
-            self._state = KinematicsState.from_msgpack(
-                self.rpc_client.call("simGetGroundTruthKinematics", self.car_name)
+    def set_api_control(self, enabled: bool, car_name: Optional[str] = None):
+        if car_name is None:
+            car_name = self.default_car_name
+        self._try_and_fail(
+            lambda: self.rpc_client.call("enableApiControl", enabled, car_name),
+            "Failed to set API control",
+        )
+
+    def get_state(self, car_name: Optional[str] = None) -> tuple[np.ndarray, np.uint64]:
+        if car_name is None:
+            car_name = self.default_car_name
+
+        def bruh() -> tuple[np.ndarray, np.uint64]:
+            self._data[car_name]["state"] = KinematicsState.from_msgpack(
+                self.rpc_client.call("simGetGroundTruthKinematics", car_name)
+            )
+            state = self._data[car_name]["state"]
+
+            # position
+            x = state.position.x_val
+            y = state.position.y_val
+            # orientation
+            phi = (
+                np.mod(to_eularian_angles(state.orientation)[2] + np.pi, 2 * np.pi)
+                - np.pi
+            )
+            self._data[car_name]["yaw"] = phi
+            # linear velocity
+            v = np.hypot(state.linear_velocity.x_val, state.linear_velocity.y_val)
+            angle_vx_vy = np.arctan2(
+                state.linear_velocity.y_val, state.linear_velocity.x_val
+            )
+            v_x = v * np.cos(angle_vx_vy - phi)
+            v_y = v * np.sin(angle_vx_vy - phi)
+            # angular velocity
+            r = state.angular_velocity.z_val
+
+            return (
+                np.array([x, y, phi, v_x, v_y, r]),
+                state.time_stamp,
             )
 
-        self._try_and_fail(update_state, "Failed to get state")
+        return self._try_and_fail(bruh, "Failed to get state")
 
-        # position
-        x = self._state.position.x_val
-        y = self._state.position.y_val
-        # orientation
-        phi = (
-            np.mod(to_eularian_angles(self._state.orientation)[2] + np.pi, 2 * np.pi)
-            - np.pi
-        )
-        self._yaw = phi
-        # linear velocity
-        v = np.hypot(
-            self._state.linear_velocity.x_val, self._state.linear_velocity.y_val
-        )
-        angle_vx_vy = np.arctan2(
-            self._state.linear_velocity.y_val, self._state.linear_velocity.x_val
-        )
-        v_x = v * np.cos(angle_vx_vy - phi)
-        v_y = v * np.sin(angle_vx_vy - phi)
-        # angular velocity
-        r = self._state.angular_velocity.z_val
+    def set_control(self, control: np.ndarray, car_name: Optional[str] = None):
+        if car_name is None:
+            car_name = self.default_car_name
 
-        return np.array([x, y, phi, v_x, v_y, r])
-
-    @property
-    def control(self):
-        return self._control
-
-    @control.setter
-    def control(self, control: np.ndarray):
         assert control.shape == (2,)
         np.clip(control[0], -1, 1, out=control[0])
         np.clip(control[1], -self.delta_max, self.delta_max, out=control[1])
-        self._control = CarControls()
-        self._control.throttle, self._control.brake = (
+
+        self._data[car_name]["control"] = CarControls()
+        (
+            self._data[car_name]["control"].throttle,
+            self._data[car_name]["control"].brake,
+        ) = (
             (control[0], 0.0) if control[0] > 0 else (0.0, control[0])
         )
-        self._control.steering = -control[1] / self.delta_max
+        self._data[car_name]["control"].steering = -control[1] / self.delta_max
 
         self._try_and_fail(
             lambda: self.rpc_client.call(
-                "simSetVehicleControls", self.car_name, control
+                "simSetVehicleControls", self.car_name, self._data[car_name]["control"]
             ),
             "Failed to set control",
         )
 
-    @property
-    def cones_observations(self):
+    def get_cones_observations(
+        self, car_name: Optional[str] = None
+    ) -> tuple[np.ndarray, np.uint64]:
+        if car_name is None:
+            car_name = self.default_car_name
+
         # TODO: here do we just use the last state or do we call the API again?
+        # self.get_state(car_name)
         cartesian = (self._all_cones - self._state[:2]) @ np.array(
             [
                 [np.cos(-self._yaw), -np.sin(-self._yaw)],
@@ -299,24 +375,200 @@ class FSDSClient:
         #     np.zeros(2),self.cones, size=polar.shape[0]
         # )
 
-        self._cones_observations = polar
-        return self._cones_observations
+        self._data[car_name]["cones_observations"] = polar
+        return (
+            self._data[car_name]["cones_observations"],
+            self._data[car_name]["state"].time_stamp,
+        )
 
-    @property
-    def image(self):
-        def get_image():
-            self._image_responses = [
+    def get_image(
+        self, camera_names: list[str] = [], car_name: Optional[str] = None
+    ) -> list[np.ndarray, np.uint64]:
+        if car_name is None:
+            car_name = self.default_car_name
+
+        assert len(camera_names) > 0
+        for camera_name in camera_names:
+            assert (
+                camera_name in self._data[car_name]
+                and self._data_types[car_name][camera_name] == ImageResponse
+            ), f"Camera {camera_name} not found"
+
+        def bruh():
+            responses = [
                 ImageResponse.from_msgpack(response)
                 for response in self.rpc_client.call(
                     "simGetImages",
+                    [
+                        ImageRequest(
+                            camera_name=camera_name,
+                            image_type=ImageType.Scene,
+                            compress=False,
+                        )
+                        for camera_name in camera_names
+                    ],
+                    car_name,
                 )
             ]
-            img1d = np.fromstring(self.image.image_data_uint8, dtype=np.uint8)
-            img_rgb = img1d.reshape((self.image.height, self.image.width, 3))
+            for i, camera_name in enumerate(camera_names):
+                self._data[car_name][camera_name] = responses[i]
+
+            # TODO: should we use fromstring or frombuffer?
+            return [
+                (
+                    np.fromstring(response.image_data_uint8, dtype=np.uint8).reshape(
+                        (response.height, response.width, 3)
+                    ),
+                    response.timestamp,
+                )
+                for response in responses
+            ]
 
         return self._try_and_fail(
-            lambda: self.rpc_client.call(
-                "simGetImage", self.camera_name, self.image_type
-            ),
+            bruh,
             "Failed to get image",
+        )
+
+    def get_point_cloud(
+        self, lidar_name: str, car_name: Optional[str] = None
+    ) -> tuple[np.ndarray, np.uint64]:
+        if car_name is None:
+            car_name = self.default_car_name
+        assert (
+            lidar_name in self._data[car_name].keys()
+            and self._data_types[car_name][lidar_name] == LidarData
+        ), f"LiDAR {lidar_name} not found"
+
+        def bruh():
+            self._data[car_name][lidar_name] = LidarData.from_msgpack(
+                self.rpc_client.call("getLidarData", lidar_name, car_name)
+            )
+            return (
+                self._data[car_name][lidar_name].point_cloud,
+                self._data[car_name][lidar_name].time_stamp,
+            )
+
+        return self._try_and_fail(
+            bruh,
+            "Failed to get point cloud",
+        )
+
+    def get_imu_data(
+        self, imu_name: str, car_name: Optional[str] = None
+    ) -> tuple[np.ndarray, np.uint64]:
+        """Get IMU data as (phi, ax, ay, r)"""
+        if car_name is None:
+            car_name = self.default_car_name
+
+        assert (
+            "imu_data" in self._data[car_name].keys()
+            and self._data_types[car_name]["imu_data"] == ImuData
+        ), f"IMU {imu_name} not found"
+
+        def bruh():
+            self._data[car_name]["imu_data"] = ImuData.from_msgpack(
+                self.rpc_client.call("getImuData", car_name)
+            )
+            return (
+                np.array(
+                    [
+                        np.mod(
+                            to_eularian_angles(
+                                self._data[car_name]["imu_data"].orientation
+                            )[2]
+                            + np.pi,
+                            2 * np.pi,
+                        )
+                        - np.pi,
+                        self._data[car_name]["imu_data"].linear_acceleration.x_val,
+                        self._data[car_name]["imu_data"].linear_acceleration.y_val,
+                        self._data[car_name]["imu_data"].angular_velocity.z_val,
+                    ]
+                ),
+                self._data[car_name]["imu_data"].time_stamp,
+            )
+
+        return self._try_and_fail(
+            bruh,
+            f"Failed to get IMU data from {imu_name} on car {car_name}",
+        )
+
+    def get_gss_data(self, gss_name: str, car_name: Optional[str] = None):
+        """Get GSS data as (vx, vy)"""
+        if car_name is None:
+            car_name = self.default_car_name
+
+        assert (
+            "gss_data" in self._data[car_name].keys()
+            and self._data_types[car_name]["gss_data"] == GpsData
+        ), f"GSS {gss_name} not found"
+
+        def bruh():
+            self._data[car_name]["gss_data"] = GroundSpeedSensorData.from_msgpack(
+                self.rpc_client.call("getGpsData", car_name)
+            )
+            return (
+                np.array(
+                    [
+                        self._data[car_name]["gss_data"].linear_velocity.x_val,
+                        self._data[car_name]["gss_data"].linear_velocity.y_val,
+                    ]
+                ),
+                self._data[car_name]["gss_data"].time_stamp,
+            )
+
+        return self._try_and_fail(
+            bruh,
+            "Failed to get GSS data",
+        )
+
+    def get_gps_data(self, gps_name: str, car_name: Optional[str] = None) -> GpsData:
+        """Get GPS data as (lat, lon)"""
+        if car_name is None:
+            car_name = self.default_car_name
+
+        assert (
+            "gps_data" in self._data[car_name].keys()
+            and self._data_types[car_name]["gps_data"] == GpsData
+        ), f"GPS {gps_name} not found"
+
+        def bruh():
+            self._data[car_name]["gps_data"] = GpsData.from_msgpack(
+                self.rpc_client.call("getGpsData", car_name)
+            )
+            return self._data[car_name]["gps_data"]
+
+        return self._try_and_fail(
+            bruh,
+            "Failed to get GPS data",
+        )
+
+    def get_wheel_speeds(
+        self, car_name: Optional[str] = None
+    ) -> tuple[np.ndarray, np.uint64]:
+        """Get wheel speeds as (omega_fl, omega_fr, omega_rl, omega_rr) (in rad/s)"""
+        if car_name is None:
+            car_name = self.default_car_name
+
+        def bruh():
+            self._data[car_name]["wheel_speeds"] = WheelStates.from_msgpack(
+                self.rpc_client.call("simGetWheelStates", car_name)
+            )
+            return (
+                np.pi
+                / 30
+                * np.array(
+                    [
+                        self._data[car_name]["wheel_speeds"].fl_rpm,
+                        self._data[car_name]["wheel_speeds"].fr_rpm,
+                        self._data[car_name]["wheel_speeds"].rl_rpm,
+                        self._data[car_name]["wheel_speeds"].rr_rpm,
+                    ]
+                ),
+                self._data[car_name]["wheel_speeds"].time_stamp,
+            )
+
+        return self._try_and_fail(
+            bruh,
+            "Failed to get wheel speeds",
         )

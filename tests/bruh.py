@@ -4,9 +4,7 @@ from fsds_client.utils import sleep
 
 def main():
     client = FSDSClient()
-    while True:
-        print(client.state)
-        sleep(0.1)
+    print({car: client._data[car].keys() for car in client._data.keys()})
 
 
 if __name__ == "__main__":
