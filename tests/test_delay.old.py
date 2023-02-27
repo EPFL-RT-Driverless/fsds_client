@@ -4,7 +4,7 @@ from time import sleep
 import numpy as np
 
 from fsds_client import HighLevelClient
-from fsds_client.utils import sleep_sub_ms
+from fsds_client.utils import sleep
 
 HOST = "127.0.0.1"
 
@@ -42,7 +42,7 @@ for i in range(100):
 print("Get lidar delay :", round(np.mean(moy) * 1000, 1), "ms")
 
 simulation.low_level_client.simPause(True)
-sleep_sub_ms(0.01)
+sleep(0.01)
 simulation.low_level_client.simPause(False)
 
 sleep(20)

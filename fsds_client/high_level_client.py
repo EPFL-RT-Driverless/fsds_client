@@ -57,7 +57,7 @@ class HighLevelClient:
         self.low_level_client = LowLevelClient(ip, 41451, 3)
         crash_guard(self.low_level_client.confirmConnection, "confirmConnection")
         crash_guard(self.low_level_client.restart, "restart")
-        sleep_sub_ms(1)
+        sleep(1)
         crash_guard(
             lambda: self.low_level_client.enableApiControl(True),
             "enableAPIControl",
@@ -157,6 +157,7 @@ class HighLevelClient:
             (altitudes > 0.2)
             & (altitudes < 0.5)
             & (np.linalg.norm(points, axis=1) < max_cone_distance)
+            & (np.linalg.norm(points, axis=1) > 2.0)
         ]
         points = points[:, :2]
 
