@@ -1,4 +1,3 @@
-from io import BytesIO
 import json
 import os
 import time
@@ -8,7 +7,6 @@ from typing import Optional, Callable, Union, Type
 
 import msgpackrpc
 import numpy as np
-from PIL import Image
 
 
 import track_database as tdb
@@ -17,7 +15,7 @@ from .utils import *
 
 __all__ = ["FSDSClient"]
 
-
+# 1,4,5 represent other AirSim sensor types that are not relevant in FSDS
 _SENSOR_TYPES = {
     2: ImuData,
     3: GpsData,
@@ -26,14 +24,6 @@ _SENSOR_TYPES = {
     8: ImageResponse,
     9: WheelStates,
 }
-
-# def png_byte_string_to_numpy_array(png_byte_string):
-#     """
-#     Converts a png byte string to a numpy array
-#     """
-#     import png
-
-#     return np.array(png.Reader(bytes=png_byte_string).asDirect()[2])
 
 
 class FSDSClient:
@@ -100,6 +90,7 @@ class FSDSClient:
         port=41451,
         timeout_value=3,
         api_control=True,
+        restart=True,
         default_car_name="FSDSCar",
         delta_max: float = np.deg2rad(45.0),
         cones_range_limits: Union[float, tuple[float]] = (0.0, 100.0),
@@ -109,12 +100,19 @@ class FSDSClient:
         self.ip = ip
         self.port = port
         self.timeout_value = timeout_value
+
         # initialize the client
         # noinspection PyTypeChecker
         self.rpc_client = None
         self._setup_client()
-        self._try_until_success(self._confirm_connection, "Failed to ping " + self.ip)
-        # Vehicle info
+        self.ping()
+        # self._try_until_success(self.ping, "Failed to ping " + self.ip)
+        if restart:
+            # self._try_until_success(self.restart, "Failed to restart the simulation")
+            self.restart()
+            print("Restart successful")
+
+        # load vehicle info from settings.json
         with open(
             os.path.expanduser("~")
             + "/Formula-Student-Driverless-Simulator/settings.json"
@@ -151,25 +149,6 @@ class FSDSClient:
                 self._data_types[car_name]["cones_observations"] = np.ndarray
                 self._data[car_name]["cones_observations"] = np.empty((0, 2))
 
-            # self._data = {
-            #     car_name: {
-            #         sensor_name: None
-            #         for sensor_name in settings["Vehicles"][car_name]["Sensors"].keys()
-            #         if settings["Vehicles"][car_name]["Sensors"][sensor_name]["Enabled"]
-            #     }
-            #     | {
-            #         camera_name: ImageResponse()
-            #         for camera_name in settings["Vehicles"][car_name]["Cameras"].keys()
-            #     }
-            #     | {
-            #         "state": KinematicsState(),
-            #         "control": CarControls(),
-            #         "yaw": 0.0,
-            #         "cones_observations": np.empty((0, 2)),
-            #     }
-            #     for car_name in settings["Vehicles"].keys()
-            # }
-
             assert (
                 default_car_name in self._data.keys()
             ), "The main car name must be one of the following: " + ", ".join(
@@ -197,16 +176,17 @@ class FSDSClient:
         self.track = tdb.load_track(map_name)
         self._all_cones = np.vstack((self.track.right_cones, self.track.left_cones))
 
-    @property
     def car_names(self) -> list[str]:
         return list(self._data.keys())
 
     def camera_names(self, car_name: Optional[str] = None) -> list[str]:
         if car_name is None:
             car_name = self.default_car_name
-        return filter(
-            lambda k: self._data_types[car_name][k] == ImageResponse,
-            self._data[car_name].keys(),
+        return list(
+            filter(
+                lambda k: self._data_types[car_name][k] == ImageResponse,
+                self._data[car_name].keys(),
+            )
         )
 
     def _try_until_success(
@@ -224,72 +204,66 @@ class FSDSClient:
                 success = True
             except Exception as e:
                 warnings.warn(
-                    f"[{type(self).__name__}] {error_message} | Error message: {e}"
+                    f"[{type(self).__name__}] {error_message} | {type(e)}: {e}"
                 )
                 if aux_callback:
                     aux_callback()
                 sleep(wait_delay)
         return result
 
-    def _try_and_fail(self, callback: Callable, error_message: str, raise_error=False):
-        try:
-            return callback()
-        except Exception as e:
-            warnings.warn(
-                f"[{type(self).__name__}] {error_message} | Error message: {e}"
-            )
-            if raise_error:
-                raise e
-
     def _setup_client(self):
-        def set_rpc_client():
-            self.rpc_client = msgpackrpc.Client(
-                msgpackrpc.Address(self.ip, self.port),
-                timeout=self.timeout_value,
-                pack_encoding="utf-8",
-                unpack_encoding="utf-8",
-            )
-
-        self._try_and_fail(
-            set_rpc_client,
-            "Failed to setup client",
+        # def set_rpc_client():
+        self.rpc_client = msgpackrpc.Client(
+            msgpackrpc.Address(self.ip, self.port),
+            timeout=self.timeout_value,
+            pack_encoding="utf-8",
+            unpack_encoding="utf-8",
         )
+
+        # self._try_and_fail(
+        #     set_rpc_client,
+        #     "Failed to setup client",
+        # )
 
     def ping(self) -> bool:
         return self.rpc_client.call("ping")
 
-    def _confirm_connection(self):
-        if not self.ping():
-            raise ConnectionError("Failed to connect to FSDS server")
-
     def restart(self):
-        self._try_and_fail(lambda: self.rpc_client.call("restart"), "Failed to reset")
-        sleep(0.1)  # TODO: is this necessary?
+        # self._try_and_fail(lambda: self.rpc_client.call("restart"), "Failed to reset")
+        self.rpc_client.call("restart")
+        # sleep(0.1)  # TODO: is this necessary?
         self._setup_client()
 
     @cached_property
     def map_name(self) -> str:
         """Returns the name of the current map, which does not change during the simulation lifetime."""
         # return self.rpc_client.call("getMap")
-        return self._try_and_fail(
-            lambda: self.rpc_client.call("getMap").removesuffix("_cones"),
-            "Failed to get map name",
-        )
+        # return self._try_and_fail(
+        #     lambda: self.rpc_client.call("getMap").removesuffix("_cones"),
+        #     "Failed to get map name",
+        # )
+        return self.rpc_client.call("getMap").removesuffix("_cones")
 
     def get_api_control(self, car_name: Optional[str] = None) -> bool:
         if car_name is None:
             car_name = self.default_car_name
-        return self._try_and_fail(
-            lambda: self.rpc_client.call("isApiControlEnabled", car_name),
-            "Failed to get API control",
-        )
+        return self.rpc_client.call("isApiControlEnabled", car_name)
+        # return self._try_and_fail(
+        #     lambda:
+        #     "Failed to get API control",
+        # )
 
     def set_api_control(self, enabled: bool, car_name: Optional[str] = None):
         if car_name is None:
             car_name = self.default_car_name
-        self._try_and_fail(
+        # self._try_and_fail(
+        #     lambda: self.rpc_client.call("enableApiControl", enabled, car_name),
+        #     "Failed to set API control",
+        # )
+        self._try_until_success(
             lambda: self.rpc_client.call("enableApiControl", enabled, car_name),
             "Failed to set API control",
+            self.restart,
         )
 
     def get_state(self, car_name: Optional[str] = None) -> tuple[np.ndarray, np.uint64]:
@@ -327,7 +301,8 @@ class FSDSClient:
                 np.uint64(timestamp),
             )
 
-        return self._try_and_fail(bruh, "Failed to get state")
+        # return self._try_and_fail(bruh, "Failed to get state")
+        return bruh()
 
     def set_control(self, control: np.ndarray, car_name: Optional[str] = None):
         if car_name is None:
@@ -346,11 +321,14 @@ class FSDSClient:
         )
         self._data[car_name]["control"].steering = -control[1] / self.delta_max
 
-        self._try_and_fail(
-            lambda: self.rpc_client.call(
-                "simSetVehicleControls", self.car_name, self._data[car_name]["control"]
-            ),
-            "Failed to set control",
+        # self._try_and_fail(
+        #     lambda: self.rpc_client.call(
+        #         "simSetVehicleControls", self.car_name, self._data[car_name]["control"]
+        #     ),
+        #     "Failed to set control",
+        # )
+        self.rpc_client.call(
+            "simSetVehicleControls", self.car_name, self._data[car_name]["control"]
         )
 
     def get_cones_observations(
@@ -360,7 +338,8 @@ class FSDSClient:
             car_name = self.default_car_name
 
         # TODO: here do we just use the last state or do we call the API again?
-        # self.get_state(car_name)
+        self.get_state(car_name)
+
         cartesian = (self._all_cones - self._state[:2]) @ np.array(
             [
                 [np.cos(-self._yaw), -np.sin(-self._yaw)],
@@ -402,7 +381,7 @@ class FSDSClient:
     ) -> list[tuple[np.ndarray, np.uint64]]:
         if compressed:
             raise NotImplementedError("Compressed images not implemented yet")
-        
+
         if car_name is None:
             car_name = self.default_car_name
 
@@ -433,20 +412,22 @@ class FSDSClient:
             for i, camera_name in enumerate(camera_names):
                 self._data[car_name][camera_name] = responses[i]
 
+            # TODO: check how to get a numpy array from compressed byte string (PNG)
             return [
                 (
-                    np.frombuffer(
-                        response.image_data_uint8, dtype=np.uint8
-                    ).reshape((response.height, response.width, 3)),
+                    np.frombuffer(response.image_data_uint8, dtype=np.uint8).reshape(
+                        (response.height, response.width, 3)
+                    ),
                     response.time_stamp,
                 )
                 for response in responses
             ]
 
-        return self._try_and_fail(
-            bruh,
-            "Failed to get image",
-        )
+        # return self._try_and_fail(
+        #     bruh,
+        #     "Failed to get image",
+        # )
+        bruh()
 
     def get_point_cloud(
         self, lidar_name: str, car_name: Optional[str] = None
@@ -467,10 +448,11 @@ class FSDSClient:
                 self._data[car_name][lidar_name].time_stamp,
             )
 
-        return self._try_and_fail(
-            bruh,
-            "Failed to get point cloud",
-        )
+        # return self._try_and_fail(
+        #     bruh,
+        #     "Failed to get point cloud",
+        # )
+        bruh()
 
     def get_imu_data(
         self, imu_name: str, car_name: Optional[str] = None
@@ -507,10 +489,11 @@ class FSDSClient:
                 self._data[car_name][imu_name].time_stamp,
             )
 
-        return self._try_and_fail(
-            bruh,
-            f"Failed to get IMU data from {imu_name} on car {car_name}",
-        )
+        # return self._try_and_fail(
+        #     bruh,
+        #     f"Failed to get IMU data from {imu_name} on car {car_name}",
+        # )
+        bruh()
 
     def get_gss_data(
         self, gss_name: str, car_name: Optional[str] = None
@@ -538,10 +521,11 @@ class FSDSClient:
                 self._data[car_name][gss_name].time_stamp,
             )
 
-        return self._try_and_fail(
-            bruh,
-            "Failed to get GSS data",
-        )
+        # return self._try_and_fail(
+        #     bruh,
+        #     "Failed to get GSS data",
+        # )
+        bruh()
 
     def get_gps_data(
         self, gps_name: str, car_name: Optional[str] = None
@@ -564,10 +548,11 @@ class FSDSClient:
                 self._data[car_name][gps_name].time_stamp,
             )
 
-        return self._try_and_fail(
-            bruh,
-            "Failed to get GPS data",
-        )
+        # return self._try_and_fail(
+        #     bruh,
+        #     "Failed to get GPS data",
+        # )
+        bruh()
 
     def get_wheel_speeds(
         self, car_name: Optional[str] = None
@@ -594,7 +579,8 @@ class FSDSClient:
                 self._data[car_name]["wheel_speeds"].time_stamp,
             )
 
-        return self._try_and_fail(
-            bruh,
-            "Failed to get wheel speeds",
-        )
+        # return self._try_and_fail(
+        #     bruh,
+        #     "Failed to get wheel speeds",
+        # )
+        bruh()
