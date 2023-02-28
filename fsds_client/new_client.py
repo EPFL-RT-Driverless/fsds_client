@@ -361,7 +361,9 @@ class FSDSClient:
         if car_name is None:
             car_name = self.default_car_name
 
-        assert len(camera_names) > 0
+        if len(camera_names) == 0:
+            camera_names = self.camera_names(car_name)[0]
+
         for camera_name in camera_names:
             assert (
                 camera_name in self._data[car_name]
@@ -387,11 +389,11 @@ class FSDSClient:
         for i, camera_name in enumerate(camera_names):
             self._data[car_name][camera_name] = responses[i]
 
-        cv2image = cv2.imdecode(
-            np.frombuffer(responses[0].image_data_uint8, dtype=np.uint8), flags=0
-        )
-        arr = np.asarray(cv2image)
-        print(arr.shape)
+        # cv2image = cv2.imdecode(
+        #     np.frombuffer(responses[0].image_data_uint8, dtype=np.uint8), flags=0
+        # )
+        # arr = np.asarray(cv2image)
+        # print(arr.shape)
         return [
             (
                 np.frombuffer(response.image_data_uint8, dtype=np.uint8).reshape(
