@@ -106,6 +106,7 @@ class FSDSClient:
         self.rpc_client = None
         self._setup_client()
         self.ping()
+        print("Ping successful")
         # self._try_until_success(self.ping, "Failed to ping " + self.ip)
         if restart:
             # self._try_until_success(self.restart, "Failed to restart the simulation")
@@ -169,6 +170,7 @@ class FSDSClient:
         )
 
         self.set_api_control(api_control)
+        print("API control set")
         map_name = self.map_name
         assert (
             map_name in tdb.available_tracks
@@ -269,6 +271,9 @@ class FSDSClient:
     def get_state(self, car_name: Optional[str] = None) -> tuple[np.ndarray, np.uint64]:
         if car_name is None:
             car_name = self.default_car_name
+
+        client = FSDSClient()
+        client.get_state()
 
         def bruh() -> tuple[np.ndarray, np.uint64]:
             self._data[car_name]["state"] = KinematicsState.from_msgpack(
