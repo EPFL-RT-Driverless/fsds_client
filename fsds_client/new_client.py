@@ -105,12 +105,13 @@ class FSDSClient:
         # noinspection PyTypeChecker
         self.rpc_client = None
         self._setup_client()
-        self.ping()
+        print("Client setup successful")
+        # self.ping()
+        self._try_until_success(self.ping, "Failed to ping " + self.ip)
         print("Ping successful")
-        # self._try_until_success(self.ping, "Failed to ping " + self.ip)
         if restart:
-            # self._try_until_success(self.restart, "Failed to restart the simulation")
-            self.restart()
+            self._try_until_success(self.restart, "Failed to restart the simulation")
+            # self.restart()
             print("Restart successful")
 
         # load vehicle info from settings.json
@@ -169,8 +170,9 @@ class FSDSClient:
             else (-cones_bearing_limits, cones_bearing_limits)
         )
 
-        self.set_api_control(api_control)
+        self.set_api_control(api_control)  # we do it here because we need the car name
         print("API control set")
+        
         map_name = self.map_name
         assert (
             map_name in tdb.available_tracks
