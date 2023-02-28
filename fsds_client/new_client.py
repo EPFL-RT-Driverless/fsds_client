@@ -25,7 +25,6 @@ _SENSOR_TYPES = {
     9: WheelStates,
 }
 
-
 class FSDSClient:
     """
     Notes:
@@ -228,7 +227,7 @@ class FSDSClient:
 
     def restart(self):
         self.rpc_client.call("restart")
-        sleep(0.1)  # necessary skip
+        sleep(0.1)  # necessary
         self._setup_client()
 
     @cached_property
@@ -412,9 +411,10 @@ class FSDSClient:
         self._data[car_name][lidar_name] = LidarData.from_msgpack(
             self.rpc_client.call("getLidarData", lidar_name, car_name)
         )
+        time_stamp = np.uint64(time.time_ns())
         return (
             self._data[car_name][lidar_name].point_cloud,
-            self._data[car_name][lidar_name].time_stamp,
+            time_stamp,
         )
 
 
@@ -433,6 +433,7 @@ class FSDSClient:
         self._data[car_name][imu_name] = ImuData.from_msgpack(
             self.rpc_client.call("getImuData", imu_name, car_name)
         )
+        time_stamp = np.uint64(time.time_ns())
         return (
             np.array(
                 [
@@ -449,7 +450,7 @@ class FSDSClient:
                     self._data[car_name][imu_name].angular_velocity.z_val,
                 ]
             ),
-            self._data[car_name][imu_name].time_stamp,
+            time_stamp,
         )
 
     def get_gss_data(
@@ -467,6 +468,7 @@ class FSDSClient:
         self._data[car_name][gss_name] = GroundSpeedSensorData.from_msgpack(
             self.rpc_client.call("getGroundSpeedSensorData", car_name)
         )
+        time_stamp = np.uint64(time.time_ns())
         return (
             np.array(
                 [
@@ -474,7 +476,7 @@ class FSDSClient:
                     self._data[car_name][gss_name].linear_velocity.y_val,
                 ]
             ),
-            self._data[car_name][gss_name].time_stamp,
+time_stamp,
         )
 
     def get_gps_data(
@@ -492,9 +494,10 @@ class FSDSClient:
         self._data[car_name][gps_name] = GpsData.from_msgpack(
             self.rpc_client.call("getGpsData", gps_name, car_name)
         )
+        time_stamp = np.uint64(time.time_ns())
         return (
             self._data[car_name][gps_name],
-            self._data[car_name][gps_name].time_stamp,
+            time_stamp,
         )
 
 
@@ -509,7 +512,7 @@ class FSDSClient:
         self._data[car_name]["wheel_speeds"] = WheelStates.from_msgpack(
             self.rpc_client.call("simGetWheelStates", car_name)
         )
-        timestamp = np.uint64(time.time_ns())
+        time_stamp = np.uint64(time.time_ns())
         return (
             np.pi
             / 30
@@ -521,5 +524,5 @@ class FSDSClient:
                     self._data[car_name]["wheel_speeds"].rr_rpm,
                 ]
             ),
-            self._data[car_name]["wheel_speeds"].time_stamp,
+            time_stamp,
         )
