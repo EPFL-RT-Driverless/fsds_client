@@ -4,6 +4,9 @@ import time
 import warnings
 from functools import cached_property
 from typing import Optional, Callable, Union, Type
+from PIL import Image
+import cv2
+import io
 
 import msgpackrpc
 import numpy as np
@@ -107,7 +110,6 @@ class FSDSClient:
         self._try_until_success(self.ping, "Failed to ping " + self.ip)
         if restart:
             self._try_until_success(self.restart, "Failed to restart the simulation")
-            print("Restart successful")
 
         # load vehicle info from settings.json
         with open(
@@ -353,8 +355,8 @@ class FSDSClient:
         car_name: Optional[str] = None,
         compressed: bool = False,
     ) -> list[tuple[np.ndarray, np.uint64]]:
-        if compressed:
-            raise NotImplementedError("Compressed images not implemented yet")
+        # if compressed:
+        #     raise NotImplementedError("Compressed images not implemented yet")
 
         if car_name is None:
             car_name = self.default_car_name
@@ -375,7 +377,7 @@ class FSDSClient:
                         camera_name=camera_name,
                         image_type=ImageType.Scene,
                         compress=compressed,
-                        pixels_as_float=compressed,
+                        # pixels_as_float=compressed,
                     )
                     for camera_name in camera_names
                 ],
@@ -385,12 +387,24 @@ class FSDSClient:
         for i, camera_name in enumerate(camera_names):
             self._data[car_name][camera_name] = responses[i]
 
-        # TODO: check how to get a numpy array from compressed byte string (PNG)
+        cv2image = cv2.imdecode(
+            np.frombuffer(responses[0].image_data_uint8, dtype=np.uint8), flags=0
+        )
+        arr = np.asarray(cv2image)
+        print(arr.shape)
         return [
             (
                 np.frombuffer(response.image_data_uint8, dtype=np.uint8).reshape(
                     (response.height, response.width, 3)
-                ),
+                )
+                if not compressed
+                else np.asarray(
+                    # cv2.imdecode(
+                    #     np.frombuffer(response.image_data_uint8, dtype=np.uint8),
+                    #     flags=0,
+                    # ),
+                    Image.open(io.BytesIO(response.image_data_uint8), formats=["PNG"]),
+                ).reshape((response.height, response.width, 4))[:, :, :3],
                 response.time_stamp,
             )
             for response in responses
