@@ -91,7 +91,7 @@ class FSDSClient:
         timeout_value=3,
         api_control=True,
         restart=True,
-        default_car_name="FSDSCar",
+        default_car_name:Optional[str]=None,
         delta_max: float = np.deg2rad(45.0),
         cones_range_limits: Union[float, tuple[float]] = (0.0, 100.0),
         cones_bearing_limits: Union[float, tuple[float]] = (-np.pi, np.pi),
@@ -106,12 +106,10 @@ class FSDSClient:
         self.rpc_client = None
         self._setup_client()
         print("Client setup successful")
-        # self.ping()
         self._try_until_success(self.ping, "Failed to ping " + self.ip)
         print("Ping successful")
         if restart:
             self._try_until_success(self.restart, "Failed to restart the simulation")
-            # self.restart()
             print("Restart successful")
 
         # load vehicle info from settings.json
@@ -151,6 +149,9 @@ class FSDSClient:
                 self._data_types[car_name]["cones_observations"] = np.ndarray
                 self._data[car_name]["cones_observations"] = np.empty((0, 2))
 
+            if default_car_name is None:
+                default_car_name = list(settings["Vehicles"].keys())[0]
+
             assert (
                 default_car_name in self._data.keys()
             ), "The main car name must be one of the following: " + ", ".join(
@@ -172,8 +173,11 @@ class FSDSClient:
 
         self.set_api_control(api_control)  # we do it here because we need the car name
         print("API control set")
+
+        sleep(1.0)
         
         map_name = self.map_name
+        print("Map name gotten")
         assert (
             map_name in tdb.available_tracks
         ), f"Map {map_name} not found in track database"
@@ -241,7 +245,6 @@ class FSDSClient:
     @cached_property
     def map_name(self) -> str:
         """Returns the name of the current map, which does not change during the simulation lifetime."""
-        # return self.rpc_client.call("getMap")
         # return self._try_and_fail(
         #     lambda: self.rpc_client.call("getMap").removesuffix("_cones"),
         #     "Failed to get map name",
@@ -273,9 +276,6 @@ class FSDSClient:
     def get_state(self, car_name: Optional[str] = None) -> tuple[np.ndarray, np.uint64]:
         if car_name is None:
             car_name = self.default_car_name
-
-        client = FSDSClient()
-        client.get_state()
 
         def bruh() -> tuple[np.ndarray, np.uint64]:
             self._data[car_name]["state"] = KinematicsState.from_msgpack(
