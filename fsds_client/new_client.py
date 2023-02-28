@@ -8,7 +8,6 @@ from typing import Optional, Callable, Union, Type
 import msgpackrpc
 import numpy as np
 
-
 import track_database as tdb
 from .types import *
 from .utils import *
@@ -24,6 +23,7 @@ _SENSOR_TYPES = {
     8: ImageResponse,
     9: WheelStates,
 }
+
 
 class FSDSClient:
     """
@@ -90,7 +90,7 @@ class FSDSClient:
         timeout_value=3,
         api_control=True,
         restart=True,
-        default_car_name:Optional[str]=None,
+        default_car_name: Optional[str] = None,
         delta_max: float = np.deg2rad(45.0),
         cones_range_limits: Union[float, tuple[float]] = (0.0, 100.0),
         cones_bearing_limits: Union[float, tuple[float]] = (-np.pi, np.pi),
@@ -169,7 +169,9 @@ class FSDSClient:
         )
 
         sleep(1.0)  # important
-        self.set_api_control(api_control)  # we do it here because we need the car name, we use the default one here
+        self.set_api_control(
+            api_control
+        )  # we do it here because we need the car name, we use the default one here
 
         map_name = self.map_name
         assert (
@@ -221,7 +223,6 @@ class FSDSClient:
             unpack_encoding="utf-8",
         )
 
-
     def ping(self) -> bool:
         return self.rpc_client.call("ping")
 
@@ -239,7 +240,6 @@ class FSDSClient:
         if car_name is None:
             car_name = self.default_car_name
         return self.rpc_client.call("isApiControlEnabled", car_name)
-
 
     def set_api_control(self, enabled: bool, car_name: Optional[str] = None):
         if car_name is None:
@@ -266,8 +266,7 @@ class FSDSClient:
         y = state.position.y_val
         # orientation
         phi = (
-            np.mod(to_eularian_angles(state.orientation)[2] + np.pi, 2 * np.pi)
-            - np.pi
+            np.mod(to_eularian_angles(state.orientation)[2] + np.pi, 2 * np.pi) - np.pi
         )
         self._data[car_name]["yaw"] = phi
         # linear velocity
@@ -397,7 +396,6 @@ class FSDSClient:
             for response in responses
         ]
 
-
     def get_point_cloud(
         self, lidar_name: str, car_name: Optional[str] = None
     ) -> tuple[np.ndarray, np.uint64]:
@@ -416,7 +414,6 @@ class FSDSClient:
             self._data[car_name][lidar_name].point_cloud,
             time_stamp,
         )
-
 
     def get_imu_data(
         self, imu_name: str, car_name: Optional[str] = None
@@ -438,9 +435,9 @@ class FSDSClient:
             np.array(
                 [
                     np.mod(
-                        to_eularian_angles(
-                            self._data[car_name][imu_name].orientation
-                        )[2]
+                        to_eularian_angles(self._data[car_name][imu_name].orientation)[
+                            2
+                        ]
                         + np.pi,
                         2 * np.pi,
                     )
@@ -476,7 +473,7 @@ class FSDSClient:
                     self._data[car_name][gss_name].linear_velocity.y_val,
                 ]
             ),
-time_stamp,
+            time_stamp,
         )
 
     def get_gps_data(
@@ -499,8 +496,6 @@ time_stamp,
             self._data[car_name][gps_name],
             time_stamp,
         )
-
-
 
     def get_wheel_speeds(
         self, car_name: Optional[str] = None
