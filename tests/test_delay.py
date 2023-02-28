@@ -46,6 +46,8 @@ def main():
     print("wheel speeds: ", end="")
     wheel_speeds, timestamp = bruh(client.get_wheel_speeds)
 
+    client.restart()
+
 
 if __name__ == "__main__":
     main()
