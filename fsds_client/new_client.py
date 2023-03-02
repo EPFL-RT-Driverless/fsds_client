@@ -291,8 +291,8 @@ class FSDSClient:
             car_name = self.default_car_name
 
         assert control.shape == (2,)
-        np.clip(control[0], -1, 1, out=control[0])
-        np.clip(control[1], -self.delta_max, self.delta_max, out=control[1])
+        control[0] = np.clip(control[0], -1, 1)
+        control[1] = np.clip(control[1], -self.delta_max, self.delta_max)
 
         self._data[car_name]["control"] = CarControls()
         (
