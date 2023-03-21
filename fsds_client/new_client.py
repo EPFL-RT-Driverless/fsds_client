@@ -304,7 +304,7 @@ class FSDSClient:
         self._data[car_name]["control"].steering = -control[1] / self.delta_max
 
         self.rpc_client.call(
-            "simSetVehicleControls", self.car_name, self._data[car_name]["control"]
+            "setCarControls", self._data[car_name]["control"], car_name
         )
 
     def get_cones_observations(
