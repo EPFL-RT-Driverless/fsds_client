@@ -2,14 +2,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 from time import perf_counter
 from fsds_client import HighLevelClient
-from fsds_client.utils import sleep_sub_ms
+from fsds_client.utils import sleep
 
 
 def main():
     coords_type = "cartesian"
     client = HighLevelClient()
     client.low_level_client.enableApiControl(False)
-    sleep_sub_ms(0.1)
+    sleep(0.1)
     plt.figure()
     while True:
         plt.clf()

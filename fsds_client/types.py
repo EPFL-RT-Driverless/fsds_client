@@ -511,3 +511,4 @@ class GpsData(MsgpackMixin):
 class GroundSpeedSensorData(MsgpackMixin):
     time_stamp = np.uint64(0)
     linear_velocity = Vector3r()
+    angular_velocity = Vector3r()

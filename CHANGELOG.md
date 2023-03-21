@@ -1,3 +1,7 @@
+# v4.0.0
+
+New client for ARWO
+
 # v3.0.2
 
 - added `COLCON_IGNORE` file to ignore this package in colcon builds (for brains repo)

@@ -27,7 +27,7 @@ __all__ = [
     "read_pfm",
     "write_pfm",
     "write_png",
-    "sleep_sub_ms",
+    "sleep",
 ]
 
 
@@ -271,7 +271,7 @@ def write_png(filename, image):
     write_file(filename, png_bytes)
 
 
-def sleep_sub_ms(delay):
+def sleep(delay):
     """Function to provide accurate time delay in seconds"""
     end = time.perf_counter() + delay
     while time.perf_counter() < end:
