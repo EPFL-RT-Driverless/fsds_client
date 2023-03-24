@@ -1,2 +1,2 @@
-#  Copyright (c) 2022. Mattéo Berthet EPFL Racing Team Driverless GitHub@MattBrth
-from .high_level_client import *
+# Copyright (c) 2023. Mattéo Berthet, Tudor Oancea, EPFL Racing Team Driverless
+from .client import *

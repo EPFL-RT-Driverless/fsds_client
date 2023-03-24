@@ -1,17 +1,16 @@
+# Copyright (c) 2023. Mattéo Berthet, Tudor Oancea, EPFL Racing Team Driverless
 import json
 import os
 import time
 import warnings
 from functools import cached_property
-from typing import Optional, Callable, Union, Type
-from PIL import Image
-import cv2
-import io
+from typing import Callable, Optional, Type, Union
 
 import msgpackrpc
 import numpy as np
-
 import track_database as tdb
+from PIL import Image
+
 from .types import *
 from .utils import *
 
@@ -353,11 +352,7 @@ class FSDSClient:
         self,
         camera_names: list[str] = [],
         car_name: Optional[str] = None,
-        compressed: bool = False,
     ) -> list[tuple[np.ndarray, np.uint64]]:
-        # if compressed:
-        #     raise NotImplementedError("Compressed images not implemented yet")
-
         if car_name is None:
             car_name = self.default_car_name
 
@@ -378,8 +373,7 @@ class FSDSClient:
                     ImageRequest(
                         camera_name=camera_name,
                         image_type=ImageType.Scene,
-                        compress=compressed,
-                        # pixels_as_float=compressed,
+                        compress=False,
                     )
                     for camera_name in camera_names
                 ],
@@ -389,24 +383,11 @@ class FSDSClient:
         for i, camera_name in enumerate(camera_names):
             self._data[car_name][camera_name] = responses[i]
 
-        # cv2image = cv2.imdecode(
-        #     np.frombuffer(responses[0].image_data_uint8, dtype=np.uint8), flags=0
-        # )
-        # arr = np.asarray(cv2image)
-        # print(arr.shape)
         return [
             (
                 np.frombuffer(response.image_data_uint8, dtype=np.uint8).reshape(
                     (response.height, response.width, 3)
-                )
-                if not compressed
-                else np.asarray(
-                    # cv2.imdecode(
-                    #     np.frombuffer(response.image_data_uint8, dtype=np.uint8),
-                    #     flags=0,
-                    # ),
-                    Image.open(io.BytesIO(response.image_data_uint8), formats=["PNG"]),
-                ).reshape((response.height, response.width, 4))[:, :, :3],
+                ),
                 response.time_stamp,
             )
             for response in responses

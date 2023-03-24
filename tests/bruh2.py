@@ -1,4 +1,4 @@
-from fsds_client.new_client import *
+from fsds_client import *
 from fsds_client.utils import sleep
 
 
