@@ -26,3 +26,17 @@ There are three python modules included:
 
 ## API reference
 
+see docstrings in `client.py`
+
+## Known issues
+
+- the client will launch an error if FSDS was not launched on a custom map that can be found in our [track database](https://github.com/EPFL-RT-Driverless/track_database).
+   This can be achieved by running the following in the terminal:
+   ```bash
+   # on linux
+   TRACK_NAME="fsds_competition_2" "$FSDS/Linux-1.0.0/FSOnline/Binaries/Linux/Blocks" FSOnline -CustomMapPath="$BRAINS_SOURCE_DIR/src/track-database/track_database/data/$TRACK_NAME/$TRACK_NAME_cones.csv"
+   # on macOS
+   TRACK_NAME="fsds_competition_2" open $FSDS/FSDS.app --args -CustomMapPath=$BRAINS_SOURCE_DIR/src/track-database/track_database/data/$TRACK_NAME/$TRACK_NAME_cones.csv
+   # on Windows
+   ./FSDS.exe -args -CustomMapPath="<path_to_brains>\\src\\track-database\\track_database\\data\\short_skidpad\\short_skidpad_cones.csv"
+   ```
