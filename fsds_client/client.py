@@ -192,11 +192,11 @@ class FSDSClient:
         self._all_cones = np.vstack((self.track.right_cones, self.track.left_cones))
 
     def car_names(self) -> list[str]:
-        """ Returns the names of all the cars defined in the settings.json"""
+        """Returns the names of all the cars defined in the settings.json"""
         return list(self._data.keys())
 
     def camera_names(self, car_name: Optional[str] = None) -> list[str]:
-        """ Returns the names of all the cameras defined in the settings.json for a certain car. """
+        """Returns the names of all the cameras defined in the settings.json for a certain car."""
         if car_name is None:
             car_name = self.default_car_name
         return list(
@@ -237,28 +237,28 @@ class FSDSClient:
         )
 
     def ping(self) -> bool:
-        """ Pings the simulation. """
+        """Pings the simulation."""
         return self.rpc_client.call("ping")
 
     def restart(self):
-        """ Restarts the simulation (resets the car and coens position) and reconnects the RPC client. """
+        """Restarts the simulation (resets the car and coens position) and reconnects the RPC client."""
         self.rpc_client.call("restart")
         sleep(0.1)  # necessary
         self._setup_client()
 
     @cached_property
     def map_name(self) -> str:
-        """ Returns the name of the current map (useful for custom maps), which does not change during the simulation lifetime. """
+        """Returns the name of the current map (useful for custom maps), which does not change during the simulation lifetime."""
         return self.rpc_client.call("getMap").removesuffix("_cones")
 
     def get_api_control(self, car_name: Optional[str] = None) -> bool:
-        """ Returns true if the API control is currently enabled, false otherwise. """
+        """Returns true if the API control is currently enabled, false otherwise."""
         if car_name is None:
             car_name = self.default_car_name
         return self.rpc_client.call("isApiControlEnabled", car_name)
 
     def set_api_control(self, enabled: bool, car_name: Optional[str] = None):
-        """ Enables or disables the API control. """
+        """Enables or disables the API control."""
         if car_name is None:
             car_name = self.default_car_name
 
@@ -269,7 +269,7 @@ class FSDSClient:
         )
 
     def get_state(self, car_name: Optional[str] = None) -> tuple[np.ndarray, np.uint64]:
-        """ Returns the 6 DOF sate in the following format: (X,Y,phi,v_x,v_y,r) or global pose in cartesian coordinates, longitudinal velocity, lateral velocity and yaw rate. """
+        """Returns the 6 DOF sate in the following format: (X,Y,phi,v_x,v_y,r) or global pose in cartesian coordinates, longitudinal velocity, lateral velocity and yaw rate."""
         if car_name is None:
             car_name = self.default_car_name
 
@@ -303,7 +303,7 @@ class FSDSClient:
         )
 
     def set_control(self, control: np.ndarray, car_name: Optional[str] = None):
-        """ Sets the control of the car using a throttle input between -1 and 1, and a steering input between -delta_max and delta_max. """
+        """Sets the control of the car using a throttle input between -1 and 1, and a steering input between -delta_max and delta_max."""
         if car_name is None:
             car_name = self.default_car_name
 
@@ -327,7 +327,7 @@ class FSDSClient:
     def get_cones_observations(
         self, car_name: Optional[str] = None
     ) -> tuple[np.ndarray, np.uint64]:
-        """ Returns the ground truth position of the cones (in polar coordinates in the car reference frame) within certain range and bearing limits defined by cones_range_limits and cones_bearing_limits. """
+        """Returns the ground truth position of the cones (in polar coordinates in the car reference frame) within certain range and bearing limits defined by cones_range_limits and cones_bearing_limits."""
         if car_name is None:
             car_name = self.default_car_name
 
