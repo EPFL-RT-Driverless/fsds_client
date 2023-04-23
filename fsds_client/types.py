@@ -1,4 +1,4 @@
-# Copyright (c) 2022 Mattéo Berthet, EPFL Racing Team Driverless
+# Copyright (c) 2023. Mattéo Berthet, Tudor Oancea, EPFL Racing Team Driverless
 from __future__ import print_function
 
 import numpy as np

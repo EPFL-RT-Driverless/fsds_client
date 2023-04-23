@@ -1,5 +1,4 @@
-from fsds_client.new_client import *
-import pytest
+from fsds_client import *
 
 
 def test_init():

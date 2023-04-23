@@ -1,17 +1,15 @@
+# Copyright (c) 2023. Mattéo Berthet, Tudor Oancea, EPFL Racing Team Driverless
 import json
 import os
 import time
 import warnings
 from functools import cached_property
-from typing import Optional, Callable, Union, Type
-from PIL import Image
-import cv2
-import io
+from typing import Callable, Optional, Type, Union
 
 import msgpackrpc
 import numpy as np
-
 import track_database as tdb
+
 from .types import *
 from .utils import *
 
@@ -30,8 +28,8 @@ _SENSOR_TYPES = {
 
 class FSDSClient:
     """
-    Notes:
-        - we only consider a single car => development of a pipeline instead of a competition
+    This class wraps the RPC client used to communicate with the FSDS simulator.
+    It provides a simple interface to request data from the simulator and to send control commands.
     """
 
     # RPC client parameters
@@ -98,6 +96,17 @@ class FSDSClient:
         cones_range_limits: Union[float, tuple[float]] = (0.0, 100.0),
         cones_bearing_limits: Union[float, tuple[float]] = (-np.pi, np.pi),
     ):
+        """
+        :param ip: IP address of the simulator
+        :param port: port of the simulator
+        :param timeout_value: timeout in seconds for all RPC calls
+        :param api_control: if True, the client will take control of the vehicle
+        :param restart: if True, the simulator will be restarted at initialization, see restart method for more details
+        :param default_car_name: default car identifier for each data fetching or sending method. Needs to be specified in the settings.json file of FSDS
+        :param delta_max: maximal steering angle in radians used to normalize the steering command sent to FSDS. Should only be changed if you changed FSDS source code.
+        :param cones_range_limits: maximal range in meters of artificial cones observations (ground truth). Can be used to mimick sensors with finite range.
+        :param cones_bearing_limits: maximal and minimal bearing in radians of artificial cones observations (ground truth). Can be used to mimick sensors with FOV smaller than 360°.
+        """
         # RPC client parameters
         self.ip = ip
         self.port = port
@@ -183,9 +192,11 @@ class FSDSClient:
         self._all_cones = np.vstack((self.track.right_cones, self.track.left_cones))
 
     def car_names(self) -> list[str]:
+        """Returns the names of all the cars defined in the settings.json"""
         return list(self._data.keys())
 
     def camera_names(self, car_name: Optional[str] = None) -> list[str]:
+        """Returns the names of all the cameras defined in the settings.json for a certain car."""
         if car_name is None:
             car_name = self.default_car_name
         return list(
@@ -226,24 +237,28 @@ class FSDSClient:
         )
 
     def ping(self) -> bool:
+        """Pings the simulation."""
         return self.rpc_client.call("ping")
 
     def restart(self):
+        """Restarts the simulation (resets the car and coens position) and reconnects the RPC client."""
         self.rpc_client.call("restart")
         sleep(0.1)  # necessary
         self._setup_client()
 
     @cached_property
     def map_name(self) -> str:
-        """Returns the name of the current map, which does not change during the simulation lifetime."""
+        """Returns the name of the current map (useful for custom maps), which does not change during the simulation lifetime."""
         return self.rpc_client.call("getMap").removesuffix("_cones")
 
     def get_api_control(self, car_name: Optional[str] = None) -> bool:
+        """Returns true if the API control is currently enabled, false otherwise."""
         if car_name is None:
             car_name = self.default_car_name
         return self.rpc_client.call("isApiControlEnabled", car_name)
 
     def set_api_control(self, enabled: bool, car_name: Optional[str] = None):
+        """Enables or disables the API control."""
         if car_name is None:
             car_name = self.default_car_name
 
@@ -254,6 +269,7 @@ class FSDSClient:
         )
 
     def get_state(self, car_name: Optional[str] = None) -> tuple[np.ndarray, np.uint64]:
+        """Returns the 6 DOF sate in the following format: (X,Y,phi,v_x,v_y,r) or global pose in cartesian coordinates, longitudinal velocity, lateral velocity and yaw rate."""
         if car_name is None:
             car_name = self.default_car_name
 
@@ -287,6 +303,7 @@ class FSDSClient:
         )
 
     def set_control(self, control: np.ndarray, car_name: Optional[str] = None):
+        """Sets the control of the car using a throttle input between -1 and 1, and a steering input between -delta_max and delta_max."""
         if car_name is None:
             car_name = self.default_car_name
 
@@ -310,6 +327,7 @@ class FSDSClient:
     def get_cones_observations(
         self, car_name: Optional[str] = None
     ) -> tuple[np.ndarray, np.uint64]:
+        """Returns the ground truth position of the cones (in polar coordinates in the car reference frame) within certain range and bearing limits defined by cones_range_limits and cones_bearing_limits."""
         if car_name is None:
             car_name = self.default_car_name
 
@@ -353,11 +371,7 @@ class FSDSClient:
         self,
         camera_names: list[str] = [],
         car_name: Optional[str] = None,
-        compressed: bool = False,
     ) -> list[tuple[np.ndarray, np.uint64]]:
-        # if compressed:
-        #     raise NotImplementedError("Compressed images not implemented yet")
-
         if car_name is None:
             car_name = self.default_car_name
 
@@ -378,8 +392,7 @@ class FSDSClient:
                     ImageRequest(
                         camera_name=camera_name,
                         image_type=ImageType.Scene,
-                        compress=compressed,
-                        # pixels_as_float=compressed,
+                        compress=False,
                     )
                     for camera_name in camera_names
                 ],
@@ -389,24 +402,11 @@ class FSDSClient:
         for i, camera_name in enumerate(camera_names):
             self._data[car_name][camera_name] = responses[i]
 
-        # cv2image = cv2.imdecode(
-        #     np.frombuffer(responses[0].image_data_uint8, dtype=np.uint8), flags=0
-        # )
-        # arr = np.asarray(cv2image)
-        # print(arr.shape)
         return [
             (
                 np.frombuffer(response.image_data_uint8, dtype=np.uint8).reshape(
                     (response.height, response.width, 3)
-                )
-                if not compressed
-                else np.asarray(
-                    # cv2.imdecode(
-                    #     np.frombuffer(response.image_data_uint8, dtype=np.uint8),
-                    #     flags=0,
-                    # ),
-                    Image.open(io.BytesIO(response.image_data_uint8), formats=["PNG"]),
-                ).reshape((response.height, response.width, 4))[:, :, :3],
+                ),
                 response.time_stamp,
             )
             for response in responses

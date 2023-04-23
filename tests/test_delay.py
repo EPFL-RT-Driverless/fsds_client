@@ -1,6 +1,6 @@
 import numpy as np
 
-from fsds_client.new_client import *
+from fsds_client import *
 from time import time_ns, perf_counter
 from fsds_client.utils import sleep
 import tqdm
