@@ -1,3 +1,11 @@
+# v4.0.2
+
+fixed a bug in `FSDSClient.get_cones_observations()`
+
+# v4.0.1
+
+added some documentation
+
 # v4.0.0
 
 New client for ARWO

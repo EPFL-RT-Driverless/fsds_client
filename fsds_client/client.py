@@ -332,12 +332,18 @@ class FSDSClient:
             car_name = self.default_car_name
 
         # TODO: here do we just use the last state or do we call the API again?
-        self.get_state(car_name)
+        state, timestamp = self.get_state(car_name)
 
-        cartesian = (self._all_cones - self._state[:2]) @ np.array(
+        cartesian = (self._all_cones - state[:2]) @ np.array(
             [
-                [np.cos(-self._yaw), -np.sin(-self._yaw)],
-                [np.sin(-self._yaw), np.cos(-self._yaw)],
+                [
+                    np.cos(-state[2]),
+                    -np.sin(-state[2]),
+                ],
+                [
+                    np.sin(-state[2]),
+                    np.cos(-state[2]),
+                ],
             ]
         ).T
         # transform to polar coordinates
@@ -364,7 +370,7 @@ class FSDSClient:
         self._data[car_name]["cones_observations"] = polar
         return (
             self._data[car_name]["cones_observations"],
-            self._data[car_name]["state"].time_stamp,
+            timestamp,
         )
 
     def get_image(
