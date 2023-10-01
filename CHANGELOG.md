@@ -1,3 +1,7 @@
+# v4.0.3
+
+unpinned matplotlib and scipy versions
+
 # v4.0.2
 
 fixed a bug in `FSDSClient.get_cones_observations()`
