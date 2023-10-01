@@ -14,18 +14,14 @@ with open("requirements.txt", "r") as fh:
 
 setup(
     name="fsds_client",
-    version="4.0.2",
+    version="4.0.3",
     description="Simple Python client for FSDS simulation",
     long_description=long_description,
     url="https://github.com/EPFL-RT-Driverless/fsds_client",
     author="Mattéo Berthet",
     license="MIT",
     classifiers=[
-        # "Development Status :: 1 - Planning",
-        # "Development Status :: 2 - Pre-Alpha",
-        # "Development Status :: 3 - Alpha",
         "Development Status :: 4 - Beta",
-        # "Development Status :: 5 - Production/Stable",
         "Intended Audience :: Science/Research",
         "License :: OSI Approved :: MIT License",
         "Programming Language :: Python :: 3",
